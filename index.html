@@ -1,0 +1,1727 @@
+<!doctype html>
+<html lang="th" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anona Story - ระบบจัดการสต็อกสินค้า</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#6b4c5a',     
+            navy: '#fce4ec',    
+            royal: '#f48fb1',   
+            coral: '#f06292',   
+            cream: '#fff5f8'    
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Sarabun', sans-serif; }
+    .font-display { font-family: 'Playfair Display', serif; }
+    html, body { height: 100%; margin: 0; }
+    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    .card-hover { transition: all 0.2s; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    .toast-anim { animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s; }
+    @keyframes toastIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes toastOut { from{opacity:1} to{opacity:0} }
+    .mobile-overlay { background: rgba(0,0,0,0.5); }
+  </style>
+ </head>
+ <body class="h-full bg-cream text-ink box-border">
+  <div id="app" class="h-full flex flex-col overflow-hidden">
+   
+   <!-- Toast -->
+   <div id="toast" class="fixed top-4 right-4 z-[100] hidden">
+    <div class="toast-anim bg-ink text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium"></div>
+   </div>
+   
+   <!-- Change Password Modal -->
+   <div id="changePassModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 mobile-overlay">
+    <div class="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm fade-in">
+     <h3 class="font-bold text-lg mb-4 text-ink">เปลี่ยนรหัสผ่าน</h3>
+     <form id="changePassForm" class="space-y-4">
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">รหัสผ่านปัจจุบัน</label>
+       <input id="cp_current" type="password" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50">
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">รหัสผ่านใหม่</label>
+       <input id="cp_new" type="password" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50">
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">ยืนยันรหัสผ่านใหม่</label>
+       <input id="cp_confirm" type="password" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50">
+      </div>
+      <div id="cp_error" class="text-coral text-sm hidden"></div>
+      <div class="flex gap-3 pt-2">
+       <button type="button" onclick="closeChangePassModal()" class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium transition">ยกเลิก</button>
+       <button type="submit" id="cp_btn" class="flex-1 px-4 py-2.5 rounded-xl bg-coral text-white font-medium hover:opacity-80 transition">บันทึก</button>
+      </div>
+     </form>
+    </div>
+   </div>
+
+   <!-- Edit User Modal -->
+   <div id="editUserModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 mobile-overlay">
+    <div class="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm fade-in">
+     <h3 class="font-bold text-lg mb-4 text-ink">แก้ไขข้อมูลผู้ใช้</h3>
+     <form id="editUserForm" class="space-y-4">
+      <input type="hidden" id="eu_id">
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">ชื่อผู้ใช้</label>
+       <input id="eu_name" type="text" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50">
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">รหัสผ่านใหม่ <span class="text-xs font-normal text-gray-400">(เว้นว่างหากใช้รหัสเดิม)</span></label>
+       <input id="eu_pass" type="text" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50" placeholder="รหัสผ่านใหม่">
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">สิทธิ์การใช้งาน</label>
+       <select id="eu_role" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50">
+        <option value="employee">พนักงาน</option>
+        <option value="owner">เจ้าของ</option>
+        <option value="admin">ผู้ดูแล</option>
+       </select>
+      </div>
+      <div id="eu_error" class="text-coral text-sm hidden"></div>
+      <div class="flex gap-3 pt-2">
+       <button type="button" onclick="closeEditUserModal()" class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium transition">ยกเลิก</button>
+       <button type="submit" id="eu_btn" class="flex-1 px-4 py-2.5 rounded-xl bg-coral text-white font-medium hover:opacity-80 transition">บันทึก</button>
+      </div>
+     </form>
+    </div>
+   </div>
+
+   <!-- Login Screen -->
+   <div id="loginScreen" class="h-full flex items-center justify-center p-4" style="background: linear-gradient(135deg, #fff5f8 0%, #fce4ec 50%, #f8bbd0 100%);">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm fade-in">
+     <div class="text-center mb-6">
+      <h1 id="loginStoreName" class="font-display text-3xl font-bold text-ink">Anona Story</h1>
+      <p class="text-gray-400 mt-1 text-sm">ระบบจัดการสต็อกสินค้า</p>
+     </div>
+     <div class="space-y-4">
+      <div>
+       <label for="loginUser" class="block text-sm font-medium text-gray-600 mb-1">ชื่อผู้ใช้</label> 
+       <input id="loginUser" type="text" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition" placeholder="ใส่ชื่อผู้ใช้">
+      </div>
+      <div>
+       <label for="loginPass" class="block text-sm font-medium text-gray-600 mb-1">รหัสผ่าน</label> 
+       <input id="loginPass" type="password" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition" placeholder="ใส่รหัสผ่าน">
+      </div>
+      <div id="loginError" class="text-coral text-sm hidden"></div>
+      <button id="loginBtn" class="w-full bg-coral text-white py-3 rounded-xl font-semibold hover:opacity-80 transition">เข้าสู่ระบบ</button>
+     </div>
+     <p class="text-xs text-gray-400 text-center mt-4">ค่าเริ่มต้น: admin / 1234</p>
+    </div>
+   </div>
+   
+   <!-- Main App -->
+   <div id="mainApp" class="h-full hidden flex flex-col">
+    <!-- Top Bar -->
+    <header class="bg-ink text-white flex items-center justify-between px-4 py-3 shrink-0 shadow-lg z-30">
+     <div class="flex items-center gap-3">
+      <button id="menuToggle" class="lg:hidden p-1"><i data-lucide="menu" class="w-6 h-6"></i></button>
+      <h1 id="headerStoreName" class="font-display text-lg font-bold">Anona Story</h1>
+     </div>
+     <div class="flex items-center gap-3">
+      <span id="userBadge" class="text-xs bg-royal text-white px-3 py-1 rounded-full"></span> 
+      <button id="changePassBtn" class="text-gray-300 hover:text-white transition" title="เปลี่ยนรหัสผ่าน"><i data-lucide="key" class="w-5 h-5"></i></button>
+      <button id="logoutBtn" class="text-coral hover:opacity-80 transition" title="ออกจากระบบ"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+     </div>
+    </header>
+    
+    <div class="flex flex-1 overflow-hidden relative">
+     <!-- Mobile Overlay -->
+     <div id="sidebarOverlay" class="mobile-overlay fixed inset-0 z-30 hidden lg:hidden" onclick="closeSidebar()"></div>
+     
+     <!-- Sidebar -->
+     <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-64 bg-navy text-ink transform -translate-x-full lg:translate-x-0 transition-transform duration-200 flex flex-col sidebar-scroll overflow-y-auto pt-14 lg:pt-0 shrink-0 border-r border-white/60">
+      <nav id="sideNav" class="flex-1 p-3 space-y-1"></nav>
+     </aside>
+     
+     <!-- Content -->
+     <main id="content" class="flex-1 overflow-y-auto p-4 md:p-6"></main>
+    </div>
+   </div>
+  </div>
+
+  <script>
+// ===== STATE =====
+let allRecords = [];
+let currentUser = null;
+let users = []; 
+let templates = []; 
+let stocks = []; 
+let logs = []; 
+
+// ===== FALLBACK MOCKS FOR SDKs =====
+if (typeof window.elementSdk === 'undefined') {
+  window.elementSdk = {
+    init: function(config) {
+      console.warn("Element SDK not found. Using fallback.");
+      if (config && config.onConfigChange) {
+        config.onConfigChange(config.defaultConfig || {});
+      }
+    },
+    setConfig: function(config) {
+      console.log("Mock setConfig:", config);
+    }
+  };
+}
+
+if (typeof window.dataSdk === 'undefined') {
+  window._mockDataHandler = null;
+  window.dataSdk = {
+    init: async function(handler) {
+      console.warn("Data SDK not found. Using in-memory fallback.");
+      window._mockDataHandler = handler;
+      if (handler && handler.onDataChanged) {
+        handler.onDataChanged(allRecords);
+      }
+      return { isOk: true };
+    },
+    create: async function(data) {
+      const newRecord = { ...data, __backendId: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
+      allRecords.push(newRecord);
+      if (window._mockDataHandler && window._mockDataHandler.onDataChanged) {
+        window._mockDataHandler.onDataChanged([...allRecords]);
+      }
+      return { isOk: true, data: newRecord, record: newRecord };
+    },
+    update: async function(data) {
+      const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
+      if (idx > -1) {
+        allRecords[idx] = { ...data };
+        if (window._mockDataHandler && window._mockDataHandler.onDataChanged) {
+          window._mockDataHandler.onDataChanged([...allRecords]);
+        }
+        return { isOk: true };
+      }
+      return { isOk: false, error: 'Record not found' };
+    },
+    delete: async function(data) {
+      const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
+      if (idx > -1) {
+        allRecords.splice(idx, 1);
+        if (window._mockDataHandler && window._mockDataHandler.onDataChanged) {
+          window._mockDataHandler.onDataChanged([...allRecords]);
+        }
+        return { isOk: true };
+      }
+      return { isOk: false, error: 'Record not found' };
+    }
+  };
+}
+
+const defaultConfig = {
+  store_name: 'Anona Story',
+  background_color: '#fff5f8',
+  surface_color: '#ffffff',
+  text_color: '#6b4c5a',
+  primary_action_color: '#f06292',
+  secondary_action_color: '#fce4ec'
+};
+
+let CATEGORIES = [];
+let STYLES = {}; 
+let COLORS = []; 
+let SIZES = [];
+
+function loadConfiguration() {
+  const configRec = allRecords.find(r => r.type === 'config');
+  if (configRec) {
+    try {
+      CATEGORIES = JSON.parse(configRec.category || '[]');
+      STYLES = JSON.parse(configRec.style || '{}');
+      COLORS = JSON.parse(configRec.color || '[]');
+      SIZES = JSON.parse(configRec.size || '[]');
+    } catch(e) {
+      CATEGORIES = []; STYLES = {}; COLORS = []; SIZES = [];
+    }
+  }
+  if (!CATEGORIES.length) CATEGORIES = [];
+  if (!Object.keys(STYLES).length) STYLES = {};
+  if (!COLORS.length) COLORS = [];
+  if (!SIZES.length) SIZES = [];
+}
+
+// ===== TOAST =====
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  const inner = t.querySelector('div');
+  inner.textContent = msg;
+  inner.className = `toast-anim px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${type==='error'?'bg-red-600 text-white':'bg-ink text-white'}`;
+  t.classList.remove('hidden');
+  setTimeout(()=> t.classList.add('hidden'), 3000);
+}
+
+// ===== SIDEBAR =====
+function closeSidebar() {
+  document.getElementById('sidebar').classList.add('-translate-x-full');
+  document.getElementById('sidebarOverlay').classList.add('hidden');
+}
+function openSidebar() {
+  document.getElementById('sidebar').classList.remove('-translate-x-full');
+  document.getElementById('sidebarOverlay').classList.remove('hidden');
+}
+document.getElementById('menuToggle').onclick = openSidebar;
+
+let currentPage = 'dashboard';
+function buildSidebar() {
+  const nav = document.getElementById('sideNav');
+  const role = currentUser?.role || 'employee';
+  const items = [];
+  items.push({id:'dashboard', icon:'layout-dashboard', label:'แดชบอร์ด'});
+  items.push({id:'stock', icon:'package', label:'สต็อกสินค้า'});
+  if (role==='owner'||role==='admin') {
+    items.push({id:'manage_config', icon:'settings', label:'จัดการการตั้งค่า'});
+    items.push({id:'add_type', icon:'plus-circle', label:'เพิ่มชนิดสินค้า'});
+  }
+  items.push({id:'adjust_stock', icon:'plus-minus', label:'ปรับจำนวนสินค้า'});
+  items.push({id:'daily_log', icon:'calendar', label:'สรุปรายวัน'});
+  if (role==='owner'||role==='admin') {
+    items.push({id:'reports', icon:'bar-chart-3', label:'รายงานสรุป'});
+    items.push({id:'emp_summary', icon:'users', label:'สรุปพนักงาน'});
+  }
+  if (role==='admin') {
+    items.push({id:'manage_users', icon:'shield', label:'จัดการผู้ใช้'});
+  }
+  nav.innerHTML = items.map(it=>`
+    <button onclick="navigateTo('${it.id}')" data-page="${it.id}" class="nav-btn w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition ${currentPage===it.id?'bg-coral text-white shadow-md':'text-ink/70 hover:bg-white/60 hover:text-ink'}">
+      <i data-lucide="${it.icon}" class="w-5 h-5"></i>${it.label}
+    </button>
+  `).join('');
+  lucide.createIcons();
+}
+
+function navigateTo(page) {
+  currentPage = page;
+  buildSidebar();
+  renderPage();
+  closeSidebar();
+}
+
+// ===== DATA HELPERS =====
+function getTemplates() { return allRecords.filter(r=>r.type==='template'); }
+function getStocks() { return allRecords.filter(r=>r.type==='stock'); }
+function getUsers() { return allRecords.filter(r=>r.type==='user'); }
+function getLogs() { return allRecords.filter(r=>r.type==='log'); }
+function todayStr() { return new Date().toISOString().slice(0,10); }
+
+function getTemplateKey(category, style, color) { return `${category}|${style}|${color}`; }
+function getStockKey(templateId, size) { return `${templateId}|${size}`; }
+
+function getTemplateStocks(templateId) {
+  return getStocks().filter(s => s.template_id === templateId);
+}
+
+// ===== RENDER PAGE =====
+function renderPage() {
+  const c = document.getElementById('content');
+  c.scrollTop = 0;
+  loadConfiguration();
+  switch(currentPage) {
+    case 'dashboard': renderDashboard(c); break;
+    case 'stock': renderStock(c); break;
+    case 'manage_config': renderManageConfig(c); break;
+    case 'add_type': renderAddType(c); break;
+    case 'adjust_stock': renderAdjustStock(c); break;
+    case 'daily_log': renderDailyLog(c); break;
+    case 'reports': renderReports(c); break;
+    case 'emp_summary': renderEmpSummary(c); break;
+    case 'manage_users': renderManageUsers(c); break;
+    default: renderDashboard(c);
+  }
+  lucide.createIcons();
+}
+
+// ===== DASHBOARD =====
+function renderDashboard(c) {
+  const summary = {};
+  CATEGORIES.forEach(cat => summary[cat] = 0);
+  getStocks().forEach(s => {
+    const tpl = getTemplates().find(t => t.__backendId === s.template_id);
+    if (tpl && summary[tpl.category] !== undefined) {
+      summary[tpl.category] += (s.quantity || 0);
+    }
+  });
+  const total = Object.values(summary).reduce((a,b)=>a+b,0);
+  const todayLogs = getLogs().filter(l=>l.date===todayStr());
+  const todayIn = todayLogs.filter(l=>l.action==='add').reduce((a,l)=>a+(l.amount||0),0);
+  const todayOut = todayLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(l.amount||0),0);
+
+  c.innerHTML = `
+    <div class="fade-in max-w-5xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-6">แดชบอร์ด</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="card-hover bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-xs text-gray-400 mb-1">สินค้าทั้งหมด</div>
+          <div class="text-3xl font-bold text-ink">${total}</div>
+        </div>
+        ${CATEGORIES.map(cat=>`
+        <div class="card-hover bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-xs text-gray-400 mb-1">${cat}</div>
+          <div class="text-3xl font-bold text-royal">${summary[cat] || 0}</div>
+        </div>`).join('')}
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-sm font-semibold mb-3 flex items-center gap-2"><i data-lucide="trending-up" class="w-4 h-4 text-green-500"></i>เพิ่มวันนี้</div>
+          <div class="text-3xl font-bold text-green-600">+${todayIn}</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-sm font-semibold mb-3 flex items-center gap-2"><i data-lucide="trending-down" class="w-4 h-4 text-coral"></i>ใช้วันนี้</div>
+          <div class="text-3xl font-bold text-coral">-${todayOut}</div>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 class="font-semibold mb-3">กิจกรรมล่าสุด</h3>
+        <div class="space-y-2 max-h-64 overflow-y-auto">
+          ${todayLogs.slice(-10).reverse().map(l=>`
+            <div class="flex items-center justify-between py-2 border-b border-gray-50 text-sm">
+              <div><span class="inline-block w-2 h-2 rounded-full ${l.action==='add'?'bg-green-500':'bg-coral'} mr-2"></span>${l.category} ${l.style} ${l.color} ${l.size}</div>
+              <div class="flex items-center gap-3">
+                <span class="${l.action==='add'?'text-green-600':'text-coral'} font-semibold">${l.action==='add'?'+':'-'}${l.amount}</span>
+                <span class="text-gray-400 text-xs">${l.employee}</span>
+              </div>
+            </div>
+          `).join('')||'<p class="text-gray-400 text-sm">ยังไม่มีกิจกรรมวันนี้</p>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ===== STOCK LIST =====
+function renderStock(c) {
+  const templates = getTemplates();
+  window.currentStockCategory = 'ทั้งหมด';
+  
+  c.innerHTML = `
+    <div class="fade-in max-w-6xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <h2 class="font-display text-2xl font-bold">สต็อกสินค้า</h2>
+        <div class="relative w-full md:w-80">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i data-lucide="search" class="w-5 h-5 text-gray-400"></i>
+          </div>
+          <input type="text" id="stockSearchInput" class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50 transition text-sm shadow-sm" placeholder="ค้นหาหมวดหมู่, แบบ, สี, ไซส์..." onkeyup="filterStockRows()">
+        </div>
+      </div>
+      
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="setStockCat('ทั้งหมด', this)" class="stock-cat-btn px-4 py-2 rounded-full text-sm bg-coral text-white border border-coral transition shadow-sm font-medium">ทั้งหมด</button>
+        ${CATEGORIES.map(cat=>`<button onclick="setStockCat('${cat}', this)" class="stock-cat-btn px-4 py-2 rounded-full text-sm border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition font-medium">${cat}</button>`).join('')}
+      </div>
+      
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500"><tr>
+              <th class="px-4 py-3 text-left">หมวดหมู่</th>
+              <th class="px-4 py-3 text-left">แบบ</th>
+              <th class="px-4 py-3 text-left">สี</th>
+              <th class="px-4 py-3 text-left">ไซส์</th>
+              <th class="px-4 py-3 text-right">จำนวน</th>
+            </tr></thead>
+            <tbody>
+              ${templates.length ? templates.flatMap(tpl => {
+                const tplStocks = getTemplateStocks(tpl.__backendId);
+                return tplStocks.map(s => {
+                  const searchStr = `${tpl.category} ${tpl.style} ${tpl.color} ${s.size}`.toLowerCase();
+                  return `
+                  <tr class="stock-row border-b border-gray-50 hover:bg-gray-50 transition" data-cat="${tpl.category}" data-search="${searchStr}">
+                    <td class="px-4 py-3">${tpl.category}</td>
+                    <td class="px-4 py-3 font-medium text-ink">${tpl.style}</td>
+                    <td class="px-4 py-3">${tpl.color}</td>
+                    <td class="px-4 py-3 font-semibold">${s.size}</td>
+                    <td class="px-4 py-3 text-right font-semibold text-base ${(s.quantity||0)<=5?'text-coral':'text-ink'}">${s.quantity || 0}</td>
+                  </tr>
+                  `;
+                });
+              }).join('') : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">ยังไม่มีสินค้าในสต็อก</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  window.setStockCat = (cat, btn) => {
+    window.currentStockCategory = cat;
+    document.querySelectorAll('.stock-cat-btn').forEach(b => {
+      b.className = 'stock-cat-btn px-4 py-2 rounded-full text-sm border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition font-medium';
+    });
+    btn.className = 'stock-cat-btn px-4 py-2 rounded-full text-sm bg-coral text-white border border-coral transition shadow-sm font-medium';
+    window.filterStockRows();
+  };
+
+  window.filterStockRows = () => {
+    const searchText = (document.getElementById('stockSearchInput')?.value || '').toLowerCase();
+    const rows = document.querySelectorAll('.stock-row');
+    
+    rows.forEach(row => {
+      const catMatch = window.currentStockCategory === 'ทั้งหมด' || row.dataset.cat === window.currentStockCategory;
+      const searchMatch = searchText === '' || row.dataset.search.includes(searchText);
+      
+      if (catMatch && searchMatch) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  };
+  lucide.createIcons();
+}
+
+// ===== MANAGE CONFIGURATION (Owner/Admin) =====
+function renderManageConfig(c) {
+  c.innerHTML = `
+    <div class="fade-in max-w-4xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-6">จัดการการตั้งค่าหมวดหมู่และแบบ</h2>
+      
+      ${CATEGORIES.length === 0 ? `
+      <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
+        <p class="text-sm text-blue-800">ยินดีต้อนรับ! เริ่มต้นการตั้งค่าระบบโดยเพิ่มหมวดหมู่สินค้า เช่น เสื้อ, กางเกง, กระโปรง ก่อน</p>
+      </div>
+      ` : ''}
+
+      <!-- Add Category -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>เพิ่มหมวดหมู่สินค้า</h3>
+        <form id="addCatForm" class="flex gap-3">
+          <input id="ac_name" type="text" placeholder="เช่น เสื้อ, กางเกง, กระโปรง, ชุดเดรส" class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50">
+          <button type="submit" class="bg-coral text-white px-6 py-2.5 rounded-xl font-semibold hover:opacity-80 transition">เพิ่ม</button>
+        </form>
+        <div id="ac_error" class="text-coral text-sm mt-2 hidden"></div>
+      </div>
+
+      <!-- Manage Categories -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <h3 class="font-semibold mb-3">หมวดหมู่ที่มี</h3>
+        <div class="space-y-2">
+          ${CATEGORIES.length ? CATEGORIES.map(cat => `
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <span>${cat}</span>
+              <button type="button" onclick="deleteCategoryItem('${cat}')" class="text-gray-400 hover:text-coral transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            </div>
+          `).join('') : '<p class="text-gray-400 text-sm">ยังไม่มีหมวดหมู่ - เริ่มต้นด้วยการเพิ่มหมวดหมู่ข้างบน</p>'}
+        </div>
+      </div>
+
+      <!-- Add Style -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>เพิ่มแบบสินค้า</h3>
+        <form id="addStyleForm" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <select id="as_cat" class="border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50">
+            <option value="">เลือกหมวดหมู่</option>
+            ${CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+          </select>
+          <div class="flex gap-3">
+            <input id="as_name" type="text" placeholder="เช่น Boy ยาว, Girl สั้น, เสื้อยืด" class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50">
+            <button type="submit" class="bg-coral text-white px-6 py-2.5 rounded-xl font-semibold hover:opacity-80 transition">เพิ่ม</button>
+          </div>
+        </form>
+        <div id="as_error" class="text-coral text-sm mt-2 hidden"></div>
+      </div>
+
+      <!-- Manage Styles by Category -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <h3 class="font-semibold mb-3">แบบตามหมวดหมู่</h3>
+        <div class="space-y-4">
+          ${CATEGORIES.length ? CATEGORIES.map(cat => `
+            <div>
+              <h4 class="font-medium text-sm text-gray-600 mb-2">${cat}</h4>
+              <div class="space-y-1 pl-4">
+                ${(STYLES[cat] || []).length ? (STYLES[cat] || []).map(style => `
+                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <div class="font-medium text-sm">${style.name}</div>
+                    </div>
+                    <div class="flex gap-2">
+                      <button type="button" onclick="deleteStyleItem('${cat}', '${style.name.replace(/'/g,"\\'")}');" class="text-gray-400 hover:text-coral transition"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                    </div>
+                  </div>
+                `).join('') : '<p class="text-gray-400 text-xs">ยังไม่มีแบบ - เพิ่มแบบได้ที่ด้านบน</p>'}
+              </div>
+            </div>
+          `).join('') : '<p class="text-gray-400 text-sm">เพิ่มหมวดหมู่ก่อน แล้วจึงเพิ่มแบบ</p>'}
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('addCatForm').onsubmit = async(e) => {
+    e.preventDefault();
+    const name = document.getElementById('ac_name').value.trim();
+    const errEl = document.getElementById('ac_error');
+    if(!name) { errEl.textContent = 'กรุณากรอกชื่อหมวดหมู่'; errEl.classList.remove('hidden'); return; }
+    if(CATEGORIES.includes(name)) { errEl.textContent = 'หมวดหมู่นี้มีแล้ว'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    CATEGORIES.push(name);
+    if(!STYLES[name]) STYLES[name] = [];
+    await saveConfig();
+    document.getElementById('ac_name').value = '';
+    renderPage();
+  };
+
+  document.getElementById('addStyleForm').onsubmit = async(e) => {
+    e.preventDefault();
+    const cat = document.getElementById('as_cat').value;
+    const name = document.getElementById('as_name').value.trim();
+    const errEl = document.getElementById('as_error');
+    if(!cat||!name) { errEl.textContent = 'กรุณาเลือกหมวดหมู่และกรอกแบบ'; errEl.classList.remove('hidden'); return; }
+    if((STYLES[cat]||[]).find(s=>s.name===name)) { errEl.textContent = 'แบบนี้มีแล้ว'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    if(!STYLES[cat]) STYLES[cat] = [];
+    STYLES[cat].push({name, colors: []});
+    await saveConfig();
+    document.getElementById('as_name').value = '';
+    document.getElementById('as_cat').value = '';
+    renderPage();
+  };
+  lucide.createIcons();
+}
+
+window.deleteCategoryItem = async(cat) => {
+  const idx = CATEGORIES.indexOf(cat);
+  if(idx > -1) {
+    CATEGORIES.splice(idx, 1);
+    if(STYLES[cat]) delete STYLES[cat];
+    await saveConfig();
+    renderPage();
+  }
+};
+
+window.deleteStyleItem = async(cat, styleName) => {
+  if(STYLES[cat]) {
+    const idx = STYLES[cat].findIndex(s=>s.name===styleName);
+    if(idx > -1) {
+      STYLES[cat].splice(idx, 1);
+      await saveConfig();
+      renderPage();
+    }
+  }
+};
+
+window.deleteColorItem = async(color) => {
+  const idx = COLORS.indexOf(color);
+  if(idx > -1) {
+    COLORS.splice(idx, 1);
+    await saveConfig();
+    renderPage();
+  }
+};
+
+window.deleteSizeItem = async(size) => {
+  const idx = SIZES.indexOf(size);
+  if(idx > -1) {
+    SIZES.splice(idx, 1);
+    await saveConfig();
+    renderPage();
+  }
+};
+
+async function saveConfig() {
+  const existing = allRecords.find(r => r.type === 'config');
+  if(existing) {
+    await window.dataSdk.update({
+      ...existing,
+      category: JSON.stringify(CATEGORIES),
+      style: JSON.stringify(STYLES),
+      color: JSON.stringify(COLORS),
+      size: JSON.stringify(SIZES)
+    });
+  } else {
+    if(allRecords.length < 999) {
+      await window.dataSdk.create({
+        type: 'config',
+        category: JSON.stringify(CATEGORIES),
+        style: JSON.stringify(STYLES),
+        color: JSON.stringify(COLORS),
+        size: JSON.stringify(SIZES),
+        quantity: 0,
+        action: '',
+        amount: 0,
+        employee: '',
+        role: '',
+        password: '',
+        date: '',
+        note: '',
+        template_id: '',
+        sizes_json: ''
+      });
+    }
+  }
+}
+
+// ===== ADD TYPE (Owner/Admin) =====
+function renderAddType(c) {
+  const templates = getTemplates();
+  let selectedStyle = null;
+  let selectedColors = [];
+  let selectedSizes = {};
+
+  c.innerHTML = `
+    <div class="fade-in max-w-5xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-6">เพิ่มชนิดสินค้า</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Manage Colors -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="palette" class="w-4 h-4"></i>จัดการสี</h3>
+          <form id="addTypeColorForm" class="flex gap-2 mb-4">
+            <input id="at_colorname" type="text" placeholder="เพิ่มสีใหม่ เช่น ขาว, ดำ" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coral/50">
+            <button type="submit" class="bg-coral text-white px-4 py-2 rounded-xl text-sm font-semibold hover:opacity-80 transition">เพิ่ม</button>
+          </form>
+          <div id="at_colorerror" class="text-coral text-xs mb-2 hidden"></div>
+          <div class="flex flex-wrap gap-2">
+            ${COLORS.length ? COLORS.map(color => `
+              <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full text-sm">
+                <span>${color}</span>
+                <button type="button" onclick="deleteColorItem('${color}')" class="text-gray-400 hover:text-coral transition ml-1"><i data-lucide="x" class="w-3 h-3"></i></button>
+              </div>
+            `).join('') : '<span class="text-gray-400 text-sm">ยังไม่มีสีในระบบ</span>'}
+          </div>
+        </div>
+
+        <!-- Manage Sizes -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="ruler" class="w-4 h-4"></i>จัดการไซส์</h3>
+          <form id="addTypeSizeForm" class="flex gap-2 mb-4">
+            <input id="at_sizename" type="text" placeholder="เพิ่มไซส์ใหม่ เช่น S, M, L" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coral/50">
+            <button type="submit" class="bg-coral text-white px-4 py-2 rounded-xl text-sm font-semibold hover:opacity-80 transition">เพิ่ม</button>
+          </form>
+          <div id="at_sizeerror" class="text-coral text-xs mb-2 hidden"></div>
+          <div class="flex flex-wrap gap-2">
+            ${SIZES.length ? SIZES.map(size => `
+              <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full text-sm">
+                <span>${size}</span>
+                <button type="button" onclick="deleteSizeItem('${size}')" class="text-gray-400 hover:text-coral transition ml-1"><i data-lucide="x" class="w-3 h-3"></i></button>
+              </div>
+            `).join('') : '<span class="text-gray-400 text-sm">ยังไม่มีไซส์ในระบบ</span>'}
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Product Type Form -->
+      <form id="typeForm" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+        <h3 class="font-semibold text-lg border-b border-gray-100 pb-3">สร้างชนิดสินค้าเข้าระบบ</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">หมวดหมู่</label>
+            <select id="tf_cat" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50" onchange="updateTypeStylesNew()">
+              <option value="">เลือกหมวดหมู่</option>
+              ${CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">แบบ</label>
+            <select id="tf_style" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50" onchange="updateStyleColorsNew()">
+              <option value="">เลือกแบบ</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="colorContainer" class="hidden">
+          <label class="block text-sm font-medium text-gray-600 mb-3">เลือกสี (สามารถเลือกได้หลายสีจากสีทั้งหมดในระบบ)</label>
+          <div id="colorGrid" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <div id="selectedColorsContainer" class="hidden">
+          <label class="block text-sm font-medium text-gray-600 mb-3">สีที่เลือก - เลือกไซส์สำหรับแต่ละสี</label>
+          <div id="sizeSelectionContainer" class="space-y-4"></div>
+        </div>
+
+        <div id="tf_error" class="text-coral text-sm hidden"></div>
+        <button type="submit" id="tf_btn" class="w-full py-3 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 transition">
+          สร้างชนิดสินค้า
+        </button>
+      </form>
+    </div>`;
+
+  document.getElementById('addTypeColorForm').onsubmit = async(e) => {
+    e.preventDefault();
+    const name = document.getElementById('at_colorname').value.trim();
+    const errEl = document.getElementById('at_colorerror');
+    if(!name) return;
+    if(COLORS.includes(name)) { errEl.textContent = 'สีนี้มีแล้ว'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    COLORS.push(name);
+    await saveConfig();
+    renderPage();
+  };
+
+  document.getElementById('addTypeSizeForm').onsubmit = async(e) => {
+    e.preventDefault();
+    const name = document.getElementById('at_sizename').value.trim();
+    const errEl = document.getElementById('at_sizeerror');
+    if(!name) return;
+    if(SIZES.includes(name)) { errEl.textContent = 'ไซส์นี้มีแล้ว'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    SIZES.push(name);
+    await saveConfig();
+    renderPage();
+  };
+
+  function renderColorGrid() {
+    const colorContainer = document.getElementById('colorContainer');
+    const grid = document.getElementById('colorGrid');
+    
+    if (!selectedStyle) {
+      colorContainer.classList.add('hidden');
+      return;
+    }
+
+    if (COLORS.length === 0) {
+      colorContainer.classList.add('hidden');
+      return;
+    }
+
+    colorContainer.classList.remove('hidden');
+    grid.innerHTML = COLORS.map(color => `
+      <button type="button" class="color-btn px-4 py-2 rounded-lg border-2 transition ${selectedColors.includes(color) ? 'border-coral bg-coral/10 font-medium' : 'border-gray-200 bg-gray-50 hover:border-coral'}" onclick="toggleColorNew('${color}', event)">
+        ${color}
+      </button>
+    `).join('');
+  }
+
+  window.toggleColorNew = (color, e) => {
+    e.preventDefault();
+    const idx = selectedColors.indexOf(color);
+    if (idx > -1) {
+      selectedColors.splice(idx, 1);
+      delete selectedSizes[color];
+    } else {
+      selectedColors.push(color);
+      selectedSizes[color] = [];
+    }
+    renderColorGrid();
+    renderSizeSelection();
+  };
+
+  function renderSizeSelection() {
+    const container = document.getElementById('selectedColorsContainer');
+    const sizeContainer = document.getElementById('sizeSelectionContainer');
+
+    if (selectedColors.length === 0) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    container.classList.remove('hidden');
+    sizeContainer.innerHTML = selectedColors.map(color => `
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+        <h4 class="font-medium text-sm mb-3">ไซส์สำหรับสี: <span class="text-coral">${color}</span></h4>
+        <div class="flex flex-wrap gap-2">
+          ${SIZES.map(size => `
+            <button type="button" class="size-btn px-4 py-2 rounded-lg text-sm border-2 transition ${(selectedSizes[color]||[]).includes(size) ? 'border-green-500 bg-green-100 font-medium' : 'border-gray-200 bg-white hover:border-green-300'}" onclick="toggleSizeNew('${color}', '${size}', event)">
+              ${size}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window.toggleSizeNew = (color, size, e) => {
+    e.preventDefault();
+    if (!selectedSizes[color]) selectedSizes[color] = [];
+    const idx = selectedSizes[color].indexOf(size);
+    if (idx > -1) {
+      selectedSizes[color].splice(idx, 1);
+    } else {
+      selectedSizes[color].push(size);
+    }
+    renderSizeSelection();
+  };
+
+  window.updateTypeStylesNew = () => {
+    const cat = document.getElementById('tf_cat').value;
+    const sel = document.getElementById('tf_style');
+    sel.innerHTML = '<option value="">เลือกแบบ</option>' + (STYLES[cat]||[]).map((s,i)=>`<option value="${i}">${s.name}</option>`).join('');
+    selectedStyle = null;
+    selectedColors = [];
+    selectedSizes = {};
+    renderColorGrid();
+    renderSizeSelection();
+  };
+
+  window.updateStyleColorsNew = () => {
+    const cat = document.getElementById('tf_cat').value;
+    const styleIdx = parseInt(document.getElementById('tf_style').value);
+    if (isNaN(styleIdx) || !STYLES[cat] || !STYLES[cat][styleIdx]) {
+      selectedStyle = null;
+    } else {
+      selectedStyle = STYLES[cat][styleIdx];
+    }
+    selectedColors = [];
+    selectedSizes = {};
+    renderColorGrid();
+    renderSizeSelection();
+  };
+
+  document.getElementById('typeForm').onsubmit = async(e) => {
+    e.preventDefault();
+    const cat = document.getElementById('tf_cat').value;
+    const styleIdx = parseInt(document.getElementById('tf_style').value);
+    const errEl = document.getElementById('tf_error');
+
+    if (!cat || isNaN(styleIdx) || !STYLES[cat] || !STYLES[cat][styleIdx]) {
+      errEl.textContent = 'กรุณาเลือกหมวดหมู่และแบบ';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    if (selectedColors.length === 0) {
+      errEl.textContent = 'กรุณาเลือกอย่างน้อย 1 สี';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    for (const color of selectedColors) {
+      if (!selectedSizes[color] || selectedSizes[color].length === 0) {
+        errEl.textContent = `กรุณาเลือกไซส์สำหรับสี "${color}"`;
+        errEl.classList.remove('hidden');
+        return;
+      }
+    }
+    errEl.classList.add('hidden');
+
+    const btn = document.getElementById('tf_btn');
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึก...';
+
+    const style = STYLES[cat][styleIdx];
+
+    try {
+      for (const color of selectedColors) {
+        const key = `${cat}|${style.name}|${color}`;
+        
+        if (getTemplates().find(t => `${t.category}|${t.style}|${t.color}` === key)) {
+          errEl.textContent = `ชนิดสินค้า "${style.name} ${color}" มีแล้ว`;
+          errEl.classList.remove('hidden');
+          btn.disabled = false;
+          btn.textContent = 'สร้างชนิดสินค้า';
+          return;
+        }
+
+        if (allRecords.length >= 999) {
+          errEl.textContent = 'ข้อมูลเต็มแล้ว (999 รายการ)';
+          errEl.classList.remove('hidden');
+          btn.disabled = false;
+          btn.textContent = 'สร้างชนิดสินค้า';
+          return;
+        }
+
+        const templateRes = await window.dataSdk.create({
+          type: 'template',
+          category: cat,
+          style: style.name,
+          color,
+          size: '',
+          quantity: 0,
+          action: '',
+          amount: 0,
+          employee: '',
+          role: '',
+          password: '',
+          date: '',
+          note: '',
+          template_id: '',
+          sizes_json: JSON.stringify(selectedSizes[color])
+        });
+
+        if (!templateRes.isOk) {
+          errEl.textContent = 'เกิดข้อผิดพลาดในการสร้างสินค้า';
+          errEl.classList.remove('hidden');
+          btn.disabled = false;
+          btn.textContent = 'สร้างชนิดสินค้า';
+          return;
+        }
+
+        let newTemplateId = templateRes?.data?.__backendId || templateRes?.record?.__backendId;
+        if (!newTemplateId) {
+            await new Promise(r => setTimeout(r, 600)); 
+            loadConfiguration();
+            const foundTpl = getTemplates().find(t => t.category === cat && t.style === style.name && t.color === color);
+            newTemplateId = foundTpl ? foundTpl.__backendId : null;
+        }
+        
+        if (newTemplateId) {
+          for (const size of selectedSizes[color]) {
+            if (allRecords.length >= 999) break;
+            
+            await window.dataSdk.create({
+              type: 'stock',
+              category: cat,
+              style: style.name,
+              color,
+              size,
+              quantity: 0,
+              action: '',
+              amount: 0,
+              employee: '',
+              role: '',
+              password: '',
+              date: '',
+              note: '',
+              template_id: newTemplateId,
+              sizes_json: ''
+            });
+          }
+        }
+      }
+
+      showToast('สร้างชนิดสินค้าสำเร็จ');
+      btn.disabled = false;
+      btn.textContent = 'สร้างชนิดสินค้า';
+      document.getElementById('typeForm').reset();
+      selectedStyle = null;
+      selectedColors = [];
+      selectedSizes = {};
+      renderColorGrid();
+      renderSizeSelection();
+    } catch (err) {
+      errEl.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || '');
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'สร้างชนิดสินค้า';
+    }
+  };
+
+  renderColorGrid();
+  renderSizeSelection();
+  lucide.createIcons();
+}
+
+// ===== ADJUST STOCK =====
+function renderAdjustStock(c) {
+  const templates = getTemplates();
+  let currentMode = 'add'; 
+
+  c.innerHTML = `
+    <div class="fade-in max-w-3xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-6">จัดการเพิ่ม/ลดสต็อก</h2>
+      
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <div class="flex gap-2 mb-6 p-1 bg-gray-50 rounded-xl border border-gray-200 w-fit">
+          <button id="modeAddBtn" class="px-6 py-2.5 rounded-lg text-sm font-semibold bg-green-500 text-white shadow-sm transition flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i> เพิ่มสต็อก (รับเข้า)
+          </button>
+          <button id="modeReduceBtn" class="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-white transition flex items-center gap-2">
+            <i data-lucide="minus-circle" class="w-4 h-4"></i> ใช้สต็อก (เบิกออก)
+          </button>
+        </div>
+
+        <form id="adjustForm" class="space-y-6">
+          <div class="space-y-3">
+            <label class="block text-sm font-medium text-gray-600">ค้นหาและเลือกสินค้า</label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i data-lucide="search" class="w-5 h-5 text-gray-400"></i>
+              </div>
+              <input type="text" id="af_search" class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50 transition" placeholder="พิมพ์ชื่อ หมวดหมู่ แบบ หรือสี เพื่อค้นหา...">
+            </div>
+            
+            <select id="af_template" size="5" class="w-full border border-gray-200 rounded-xl px-2 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50 bg-gray-50 text-sm" onchange="showTemplateSizes()">
+            </select>
+          </div>
+
+          <div id="sizeInputsContainer" class="hidden bg-gray-50 p-5 rounded-xl border border-gray-200">
+            <label class="block text-sm font-medium text-gray-600 mb-4" id="sizeLabel">ระบุจำนวนที่ต้องการเพิ่ม</label>
+            <div id="sizeInputs" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">เหตุผล/หมายเหตุ (ถ้ามี)</label>
+            <input id="af_note" type="text" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50" placeholder="เช่น รับสินค้าล็อตใหม่ / ลูกค้าสั่งซื้อ">
+          </div>
+
+          <div id="af_error" class="text-coral text-sm hidden"></div>
+          
+          <button type="submit" id="af_btn" class="w-full py-3.5 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 transition shadow-sm text-lg">
+            บันทึกการเพิ่มสต็อก
+          </button>
+        </form>
+      </div>
+    </div>`;
+
+  const selectEl = document.getElementById('af_template');
+  const searchEl = document.getElementById('af_search');
+  
+  function renderOptions(filterText = '') {
+    const text = filterText.toLowerCase();
+    const filtered = templates.filter(t => {
+      const label = `${t.category} ${t.style} ${t.color}`.toLowerCase();
+      return label.includes(text);
+    });
+    
+    if (filtered.length === 0) {
+      selectEl.innerHTML = `<option disabled class="text-gray-400 p-2 text-center">ไม่พบสินค้าที่ตรงกับการค้นหา</option>`;
+    } else {
+      selectEl.innerHTML = filtered.map(t => `<option value="${t.__backendId}" class="p-2.5 border-b border-gray-100 last:border-0 rounded-lg hover:bg-coral/10 focus:bg-coral/10 cursor-pointer">📦 [${t.category}] ${t.style} - สี${t.color}</option>`).join('');
+    }
+    
+    if (filtered.length === 1 && text.length > 0) {
+        selectEl.value = filtered[0].__backendId;
+    }
+    window.showTemplateSizes();
+  }
+
+  searchEl.addEventListener('input', (e) => {
+    renderOptions(e.target.value);
+  });
+
+  const btnAdd = document.getElementById('modeAddBtn');
+  const btnReduce = document.getElementById('modeReduceBtn');
+  const sizeLabel = document.getElementById('sizeLabel');
+  const submitBtn = document.getElementById('af_btn');
+
+  btnAdd.onclick = (e) => {
+    e.preventDefault();
+    currentMode = 'add';
+    btnAdd.className = 'px-6 py-2.5 rounded-lg text-sm font-semibold bg-green-500 text-white shadow-sm transition flex items-center gap-2';
+    btnReduce.className = 'px-6 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-white transition flex items-center gap-2';
+    sizeLabel.textContent = 'ระบุจำนวนที่ต้องการเพิ่ม';
+    submitBtn.className = 'w-full py-3.5 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 transition shadow-sm text-lg';
+    submitBtn.textContent = 'บันทึกการเพิ่มสต็อก';
+    window.showTemplateSizes();
+  };
+
+  btnReduce.onclick = (e) => {
+    e.preventDefault();
+    currentMode = 'reduce';
+    btnReduce.className = 'px-6 py-2.5 rounded-lg text-sm font-semibold bg-coral text-white shadow-sm transition flex items-center gap-2';
+    btnAdd.className = 'px-6 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-white transition flex items-center gap-2';
+    sizeLabel.textContent = 'ระบุจำนวนที่ต้องการใช้/เบิกออก';
+    submitBtn.className = 'w-full py-3.5 rounded-xl font-semibold text-white bg-coral hover:opacity-80 transition shadow-sm text-lg';
+    submitBtn.textContent = 'บันทึกการใช้สต็อก';
+    window.showTemplateSizes();
+  };
+
+  window.showTemplateSizes = () => {
+    const templateId = selectEl.value;
+    const container = document.getElementById('sizeInputsContainer');
+    const inputsDiv = document.getElementById('sizeInputs');
+    
+    if (!templateId) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    const template = getTemplates().find(t => t.__backendId === templateId);
+    if (!template) return;
+
+    const tplStocks = getTemplateStocks(templateId);
+    const stockMap = {};
+    tplStocks.forEach(s => stockMap[s.size] = s.quantity || 0);
+
+    let allowedSizes = SIZES;
+    if (template.sizes_json) {
+      try {
+        allowedSizes = JSON.parse(template.sizes_json) || SIZES;
+      } catch(e) {
+        allowedSizes = SIZES;
+      }
+    }
+
+    const inputColorClass = currentMode === 'add' ? 'focus:ring-green-500/50 focus:border-green-500' : 'focus:ring-coral/50 focus:border-coral';
+
+    inputsDiv.innerHTML = allowedSizes.map(size => {
+      const currentQty = stockMap[size] || 0;
+      return `
+        <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-sm font-bold text-ink">ไซส์ ${size}</label>
+            <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 font-medium">มีอยู่: ${currentQty}</span>
+          </div>
+          <input type="number" data-size="${size}" min="0" ${currentMode === 'reduce' ? `max="${currentQty}"` : ''} value="" placeholder="0" class="size-input w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${inputColorClass} transition text-center font-semibold text-lg">
+        </div>
+      `;
+    }).join('');
+    container.classList.remove('hidden');
+  };
+
+  document.getElementById('adjustForm').onsubmit = async(e) => {
+    e.preventDefault();
+    const templateId = selectEl.value;
+    const note = document.getElementById('af_note').value;
+    const errEl = document.getElementById('af_error');
+
+    if (!templateId) {
+      errEl.textContent = 'กรุณาเลือกชนิดสินค้า';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    const template = getTemplates().find(t => t.__backendId === templateId);
+    if (!template) return;
+
+    const tplStocks = getTemplateStocks(templateId);
+    const adjustments = {};
+    let totalAdjusted = 0;
+    
+    document.querySelectorAll('.size-input').forEach(inp => {
+      const val = parseInt(inp.value);
+      if (!isNaN(val) && val > 0) {
+        adjustments[inp.dataset.size] = val;
+        totalAdjusted += val;
+      }
+    });
+
+    if (totalAdjusted === 0) {
+      errEl.textContent = 'กรุณาระบุจำนวนสินค้าอย่างน้อย 1 รายการ';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    if (currentMode === 'reduce') {
+        for (const [size, amount] of Object.entries(adjustments)) {
+            const existingStock = tplStocks.find(s => s.size === size);
+            const currentQty = existingStock ? (existingStock.quantity || 0) : 0;
+            if (amount > currentQty) {
+                errEl.textContent = `จำนวนที่ระบุ (ไซส์ ${size}) มากกว่าสต็อกที่มีอยู่ (มี ${currentQty})`;
+                errEl.classList.remove('hidden');
+                return;
+            }
+        }
+    }
+
+    errEl.classList.add('hidden');
+    const btn = document.getElementById('af_btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึก...';
+
+    try {
+      for (const [size, amount] of Object.entries(adjustments)) {
+        const existingStock = tplStocks.find(s => s.size === size);
+        let newQty = 0;
+        
+        if (existingStock) {
+          const oldQty = existingStock.quantity || 0;
+          newQty = currentMode === 'add' ? oldQty + amount : oldQty - amount;
+
+          const updateRes = await window.dataSdk.update({
+            ...existingStock,
+            quantity: newQty
+          });
+
+          if (!updateRes.isOk) throw new Error(`อัปเดตสต็อกไซส์ ${size} ไม่สำเร็จ`);
+        } else if (currentMode === 'add') {
+          newQty = amount;
+          if (allRecords.length >= 999) throw new Error('ข้อมูลเต็มแล้ว (999 รายการ)');
+          
+          const createRes = await window.dataSdk.create({
+            type:'stock',
+            category:template.category,
+            style:template.style,
+            color:template.color,
+            size,
+            quantity:newQty,
+            action:'',
+            amount:0,
+            employee:'',
+            role:'',
+            password:'',
+            date:'',
+            note:'',
+            template_id:templateId,
+            sizes_json:''
+          });
+          if (!createRes.isOk) throw new Error(`สร้างสต็อกไซส์ ${size} ไม่สำเร็จ`);
+        }
+
+        if (allRecords.length < 999) {
+          await window.dataSdk.create({
+            type:'log',
+            category:template.category,
+            style:template.style,
+            color:template.color,
+            size,
+            quantity:0,
+            action: currentMode,
+            amount: amount,
+            employee:currentUser.employee,
+            role:currentUser.role,
+            password:'',
+            date:new Date().toISOString(),
+            note: note || (currentMode === 'add' ? 'เพิ่มจำนวนสินค้า' : 'เบิกออก/ใช้สินค้า'),
+            template_id:templateId,
+            sizes_json:''
+          });
+        }
+      }
+
+      showToast(currentMode === 'add' ? 'เพิ่มสต็อกสำเร็จ' : 'ลดสต็อกสำเร็จ');
+      btn.disabled=false;
+      btn.textContent=originalText;
+      
+      document.getElementById('adjustForm').reset();
+      searchEl.value = '';
+      renderOptions();
+      document.getElementById('sizeInputsContainer').classList.add('hidden');
+    } catch (err) {
+      errEl.textContent = err.message || 'เกิดข้อผิดพลาดในการบันทึก';
+      errEl.classList.remove('hidden');
+      btn.disabled=false; 
+      btn.textContent=originalText;
+    }
+  };
+
+  renderOptions();
+  lucide.createIcons();
+}
+
+// ===== DAILY LOG =====
+function renderDailyLog(c) {
+  const today = todayStr();
+  const myLogs = getLogs().filter(l=> l.date && l.date.startsWith(today) && l.employee===currentUser.employee);
+  const addCount = myLogs.filter(l=>l.action==='add').reduce((a,l)=>a+(l.amount||0),0);
+  const reduceCount = myLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(l.amount||0),0);
+
+  c.innerHTML = `
+    <div class="fade-in max-w-3xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-4">สรุปรายวัน - ${currentUser.employee}</h2>
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-xs text-gray-400">เพิ่มวันนี้</div>
+          <div class="text-2xl font-bold text-green-600">+${addCount}</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-xs text-gray-400">ใช้วันนี้</div>
+          <div class="text-2xl font-bold text-coral">-${reduceCount}</div>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500"><tr>
+            <th class="px-4 py-3 text-left">รายการ</th>
+            <th class="px-4 py-3 text-center">การกระทำ</th>
+            <th class="px-4 py-3 text-right">จำนวน</th>
+            <th class="px-4 py-3 text-left hidden md:table-cell">หมายเหตุ</th>
+          </tr></thead>
+          <tbody>
+            ${myLogs.length?myLogs.reverse().map(l=>`
+              <tr class="border-b border-gray-50">
+                <td class="px-4 py-3">${l.category} ${l.style} ${l.color} ${l.size}</td>
+                <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded-full text-xs ${l.action==='add'?'bg-green-100 text-green-700':'bg-red-100 text-coral'}">${l.action==='add'?'เพิ่ม':'ใช้'}</span></td>
+                <td class="px-4 py-3 text-right font-semibold">${l.amount}</td>
+                <td class="px-4 py-3 text-gray-400 hidden md:table-cell">${l.note||'-'}</td>
+              </tr>
+            `).join(''):'<tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">ยังไม่มีกิจกรรมวันนี้</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ===== REPORTS (Owner/Admin) =====
+function renderReports(c) {
+  const allLogs = getLogs();
+  
+  c.innerHTML = `
+    <div class="fade-in max-w-5xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-4">รายงานสรุป</h2>
+      <div class="flex gap-2 mb-4">
+        <button onclick="filterReport('day',this)" class="rpt-btn px-4 py-2 rounded-full text-sm bg-coral text-white border border-coral">รายวัน</button>
+        <button onclick="filterReport('month',this)" class="rpt-btn px-4 py-2 rounded-full text-sm border border-gray-200 bg-white text-gray-600">รายเดือน</button>
+        <button onclick="filterReport('year',this)" class="rpt-btn px-4 py-2 rounded-full text-sm border border-gray-200 bg-white text-gray-600">รายปี</button>
+      </div>
+      <div id="reportContent"></div>
+    </div>`;
+
+  window.filterReport = (p, btn) => {
+    if(btn) {
+      document.querySelectorAll('.rpt-btn').forEach(b=>b.className='rpt-btn px-4 py-2 rounded-full text-sm border border-gray-200 bg-white text-gray-600');
+      btn.className='rpt-btn px-4 py-2 rounded-full text-sm bg-coral text-white border border-coral';
+    }
+    const now = new Date();
+    let filtered;
+    if(p==='day') filtered = allLogs.filter(l=>l.date&&l.date.startsWith(todayStr()));
+    else if(p==='month') { const m = now.toISOString().slice(0,7); filtered = allLogs.filter(l=>l.date&&l.date.startsWith(m)); }
+    else { const y = now.getFullYear().toString(); filtered = allLogs.filter(l=>l.date&&l.date.startsWith(y)); }
+
+    const addTotal = filtered.filter(l=>l.action==='add').reduce((a,l)=>a+(l.amount||0),0);
+    const reduceTotal = filtered.filter(l=>l.action==='reduce').reduce((a,l)=>a+(l.amount||0),0);
+
+    const catGroup = {};
+    CATEGORIES.forEach(cat=>catGroup[cat]={add:0,reduce:0});
+    filtered.forEach(l=>{
+      if(catGroup[l.category]) {
+        if(l.action==='add') catGroup[l.category].add+=(l.amount||0);
+        else catGroup[l.category].reduce+=(l.amount||0);
+      }
+    });
+
+    document.getElementById('reportContent').innerHTML = `
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-xs text-gray-400">เพิ่มทั้งหมด</div>
+          <div class="text-3xl font-bold text-green-600">+${addTotal}</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="text-xs text-gray-400">ใช้ทั้งหมด</div>
+          <div class="text-3xl font-bold text-coral">-${reduceTotal}</div>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 class="font-semibold mb-3">แยกตามหมวดหมู่</h3>
+        ${CATEGORIES.map(cat=>`
+          <div class="flex items-center justify-between py-3 border-b border-gray-50">
+            <span class="font-medium">${cat}</span>
+            <div class="flex gap-4 text-sm">
+              <span class="text-green-600">+${catGroup[cat].add}</span>
+              <span class="text-coral">-${catGroup[cat].reduce}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+    lucide.createIcons();
+  };
+  window.filterReport('day');
+}
+
+// ===== EMPLOYEE SUMMARY (Owner/Admin) =====
+function renderEmpSummary(c) {
+  const todayLogs = getLogs().filter(l=>l.date&&l.date.startsWith(todayStr()));
+  const empMap = {};
+  todayLogs.forEach(l=>{
+    if(!empMap[l.employee]) empMap[l.employee]={add:0,reduce:0};
+    if(l.action==='add') empMap[l.employee].add+=(l.amount||0);
+    else empMap[l.employee].reduce+=(l.amount||0);
+  });
+
+  c.innerHTML = `
+    <div class="fade-in max-w-3xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-4">สรุปพนักงานรายวัน</h2>
+      <div class="space-y-3">
+        ${Object.keys(empMap).length?Object.entries(empMap).map(([name,data])=>`
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-royal text-white flex items-center justify-center font-bold">${name.charAt(0)}</div>
+              <span class="font-medium">${name}</span>
+            </div>
+            <div class="flex gap-4 text-sm">
+              <span class="text-green-600 font-semibold">+${data.add}</span>
+              <span class="text-coral font-semibold">-${data.reduce}</span>
+            </div>
+          </div>
+        `).join(''):'<div class="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm">ยังไม่มีกิจกรรมวันนี้</div>'}
+      </div>
+    </div>`;
+}
+
+// ===== MANAGE USERS (Admin) =====
+function renderManageUsers(c) {
+  const userList = getUsers();
+  c.innerHTML = `
+    <div class="fade-in max-w-3xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-4">จัดการผู้ใช้</h2>
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <h3 class="font-semibold mb-3">เพิ่มผู้ใช้ใหม่</h3>
+        <form id="addUserForm" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input id="nu_name" type="text" placeholder="ชื่อผู้ใช้" class="border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50">
+          <input id="nu_pass" type="text" placeholder="รหัสผ่าน" class="border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50">
+          <select id="nu_role" class="border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50">
+            <option value="employee">พนักงาน</option>
+            <option value="owner">เจ้าของ</option>
+            <option value="admin">ผู้ดูแล</option>
+          </select>
+          <button type="submit" id="nu_btn" class="bg-coral text-white rounded-xl px-4 py-2.5 font-semibold hover:opacity-80 transition">เพิ่ม</button>
+        </form>
+        <div id="nu_error" class="text-coral text-sm mt-2 hidden"></div>
+      </div>
+      <div class="space-y-3" id="userListContainer">
+        ${userList.map(u=>`
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full ${u.role==='admin'?'bg-coral':u.role==='owner'?'bg-royal':'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">${(u.employee||'?').charAt(0)}</div>
+              <div>
+                <div class="font-medium">${u.employee}</div>
+                <div class="text-xs text-gray-400">${u.role==='admin'?'ผู้ดูแล':u.role==='owner'?'เจ้าของ':'พนักงาน'}</div>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              ${u.employee!=='admin'?`<button onclick="openEditUserModal('${u.__backendId}')" class="text-gray-400 hover:text-royal transition p-1" title="แก้ไขข้อมูล"><i data-lucide="edit" class="w-4 h-4"></i></button>`:''}
+              ${u.employee!=='admin'?`<button onclick="deleteUser('${u.__backendId}')" class="text-gray-400 hover:text-coral transition p-1" title="ลบผู้ใช้"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`:''}
+            </div>
+          </div>
+        `).join('')||'<div class="text-gray-400 text-center py-8">ยังไม่มีผู้ใช้</div>'}
+      </div>
+    </div>`;
+
+  document.getElementById('addUserForm').onsubmit = async(e)=>{
+    e.preventDefault();
+    const name = document.getElementById('nu_name').value.trim();
+    const pass = document.getElementById('nu_pass').value.trim();
+    const role = document.getElementById('nu_role').value;
+    const errEl = document.getElementById('nu_error');
+    if(!name||!pass) { errEl.textContent='กรุณากรอกข้อมูลให้ครบ'; errEl.classList.remove('hidden'); return; }
+    if(getUsers().find(u=>u.employee===name)) { errEl.textContent='ชื่อผู้ใช้นี้มีแล้ว'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    if(allRecords.length>=999){showToast('ข้อมูลเต็มแล้ว','error');return;}
+    const btn = document.getElementById('nu_btn'); btn.disabled=true; btn.textContent='กำลังบันทึก...';
+    const res = await window.dataSdk.create({type:'user',category:'',style:'',color:'',size:'',quantity:0,action:'',amount:0,employee:name,role,password:pass,date:new Date().toISOString(),note:''});
+    btn.disabled=false; btn.textContent='เพิ่ม';
+    if(res.isOk){showToast('เพิ่มผู้ใช้สำเร็จ');document.getElementById('nu_name').value='';document.getElementById('nu_pass').value='';}
+    else showToast('เกิดข้อผิดพลาด','error');
+  };
+
+  window.deleteUser = async(id)=>{
+    const rec = allRecords.find(r=>r.__backendId===id);
+    if(!rec) return;
+    const el = document.querySelector(`[onclick="deleteUser('${id}')"]`);
+    if(el && !el.dataset.confirming){
+      el.dataset.confirming='true';
+      el.innerHTML='<span class="text-xs text-coral font-semibold">ยืนยัน?</span>';
+      setTimeout(()=>{if(el){el.innerHTML='<i data-lucide="trash-2" class="w-4 h-4"></i>';delete el.dataset.confirming;lucide.createIcons();}},3000);
+      return;
+    }
+    const res = await window.dataSdk.delete(rec);
+    if(res.isOk) showToast('ลบผู้ใช้สำเร็จ');
+    else showToast('เกิดข้อผิดพลาด','error');
+  };
+
+  lucide.createIcons();
+}
+
+// ===== LOGIN =====
+document.getElementById('loginBtn').onclick = async ()=>{
+  const username = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value.trim();
+  const errEl = document.getElementById('loginError');
+
+  // ตรวจสอบแอดมินเริ่มต้น
+  const adminRec = getUsers().find(u=>u.employee==='admin');
+  if(!adminRec && username==='admin' && pass==='1234') {
+    currentUser = {employee:'admin',role:'admin'};
+    await window.dataSdk.create({type:'user',category:'',style:'',color:'',size:'',quantity:0,action:'',amount:0,employee:'admin',role:'admin',password:'1234',date:new Date().toISOString(),note:''});
+    showMainApp();
+    return;
+  }
+
+  // ตรวจสอบผู้ใช้จากฐานข้อมูล
+  const user = getUsers().find(u=>u.employee===username&&u.password===pass);
+  if(user) {
+    currentUser = {employee:user.employee, role:user.role};
+    showMainApp();
+  } else {
+    errEl.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+    errEl.classList.remove('hidden');
+  }
+};
+
+document.getElementById('loginPass').onkeydown = (e)=>{if(e.key==='Enter')document.getElementById('loginBtn').click();};
+document.getElementById('loginUser').onkeydown = (e)=>{if(e.key==='Enter')document.getElementById('loginPass').focus();};
+
+function showMainApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+  document.getElementById('userBadge').textContent = `${currentUser.employee} (${currentUser.role==='admin'?'ผู้ดูแล':currentUser.role==='owner'?'เจ้าของ':'พนักงาน'})`;
+  buildSidebar();
+  renderPage();
+}
+
+document.getElementById('changePassBtn').onclick = () => {
+  document.getElementById('changePassModal').classList.remove('hidden');
+};
+
+window.closeChangePassModal = () => {
+  document.getElementById('changePassModal').classList.add('hidden');
+  document.getElementById('changePassForm').reset();
+  document.getElementById('cp_error').classList.add('hidden');
+};
+
+document.getElementById('changePassForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const current = document.getElementById('cp_current').value.trim();
+  const newPass = document.getElementById('cp_new').value.trim();
+  const confirmPass = document.getElementById('cp_confirm').value.trim();
+  const errEl = document.getElementById('cp_error');
+
+  if(!current || !newPass || !confirmPass) {
+    errEl.textContent = 'กรุณากรอกข้อมูลให้ครบ';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  if(newPass !== confirmPass) {
+    errEl.textContent = 'รหัสผ่านใหม่ไม่ตรงกัน';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const userRec = getUsers().find(u => u.employee === currentUser.employee);
+  if(!userRec) {
+    errEl.textContent = 'ไม่พบข้อมูลผู้ใช้';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  if(userRec.password !== current) {
+    errEl.textContent = 'รหัสผ่านปัจจุบันไม่ถูกต้อง';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  errEl.classList.add('hidden');
+  const btn = document.getElementById('cp_btn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+
+  const res = await window.dataSdk.update({...userRec, password: newPass});
+  
+  btn.disabled = false;
+  btn.textContent = 'บันทึก';
+
+  if(res.isOk) {
+    showToast('เปลี่ยนรหัสผ่านสำเร็จ');
+    closeChangePassModal();
+  } else {
+    errEl.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
+    errEl.classList.remove('hidden');
+  }
+};
+
+window.openEditUserModal = (id) => {
+  const user = getUsers().find(u => u.__backendId === id);
+  if (!user) return;
+  document.getElementById('eu_id').value = user.__backendId;
+  document.getElementById('eu_name').value = user.employee;
+  document.getElementById('eu_pass').value = ''; 
+  document.getElementById('eu_role').value = user.role;
+  document.getElementById('eu_error').classList.add('hidden');
+  document.getElementById('editUserModal').classList.remove('hidden');
+};
+
+window.closeEditUserModal = () => {
+  document.getElementById('editUserModal').classList.add('hidden');
+  document.getElementById('editUserForm').reset();
+};
+
+document.getElementById('editUserForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('eu_id').value;
+  const newName = document.getElementById('eu_name').value.trim();
+  const newPass = document.getElementById('eu_pass').value.trim();
+  const newRole = document.getElementById('eu_role').value;
+  const errEl = document.getElementById('eu_error');
+
+  if (!newName) {
+    errEl.textContent = 'กรุณากรอกชื่อผู้ใช้';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const existingUser = getUsers().find(u => u.__backendId === id);
+  if (!existingUser) return;
+
+  const nameConflict = getUsers().find(u => u.employee === newName && u.__backendId !== id);
+  if (nameConflict) {
+    errEl.textContent = 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  errEl.classList.add('hidden');
+  const btn = document.getElementById('eu_btn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+
+  const updatedData = {
+    ...existingUser,
+    employee: newName,
+    role: newRole
+  };
+  
+  if (newPass) {
+    updatedData.password = newPass;
+  }
+
+  const res = await window.dataSdk.update(updatedData);
+
+  btn.disabled = false;
+  btn.textContent = 'บันทึก';
+
+  if (res.isOk) {
+    showToast('แก้ไขข้อมูลผู้ใช้สำเร็จ');
+    closeEditUserModal();
+  } else {
+    errEl.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
+    errEl.classList.remove('hidden');
+  }
+};
+
+document.getElementById('logoutBtn').onclick = ()=>{
+  currentUser = null;
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginError').classList.add('hidden');
+  currentPage='dashboard';
+};
+
+// ===== SDK INIT =====
+const dataHandler = {
+  onDataChanged(data) {
+    allRecords = data;
+    if(currentUser) renderPage();
+  }
+};
+
+(async()=>{
+  // Element SDK
+  window.elementSdk.init({
+    defaultConfig,
+    onConfigChange: async(config)=>{
+      const storeName = config.store_name || defaultConfig.store_name;
+      const el1 = document.getElementById('loginStoreName');
+      const el2 = document.getElementById('headerStoreName');
+      if(el1) el1.textContent = storeName;
+      if(el2) el2.textContent = storeName;
+
+      document.body.style.backgroundColor = config.background_color || defaultConfig.background_color;
+      document.querySelectorAll('.bg-white').forEach(el=>{
+        el.style.backgroundColor = config.surface_color || defaultConfig.surface_color;
+      });
+    },
+    mapToCapabilities: (config) => ({
+      recolorables: [
+        {get:()=>config.background_color||defaultConfig.background_color, set:(v)=>{config.background_color=v;window.elementSdk.setConfig({background_color:v})}},
+        {get:()=>config.surface_color||defaultConfig.surface_color, set:(v)=>{config.surface_color=v;window.elementSdk.setConfig({surface_color:v})}},
+        {get:()=>config.text_color||defaultConfig.text_color, set:(v)=>{config.text_color=v;window.elementSdk.setConfig({text_color:v})}},
+        {get:()=>config.primary_action_color||defaultConfig.primary_action_color, set:(v)=>{config.primary_action_color=v;window.elementSdk.setConfig({primary_action_color:v})}},
+        {get:()=>config.secondary_action_color||defaultConfig.secondary_action_color, set:(v)=>{config.secondary_action_color=v;window.elementSdk.setConfig({secondary_action_color:v})}}
+      ],
+      borderables: [],
+      fontEditable: undefined,
+      fontSizeable: undefined
+    }),
+    mapToEditPanelValues: (config) => new Map([
+      ['store_name', config.store_name || defaultConfig.store_name]
+    ])
+  });
+
+  // Data SDK
+  const initResult = await window.dataSdk.init(dataHandler);
+  if(!initResult.isOk) console.error('Data SDK init failed');
+
+  lucide.createIcons();
+})();
+  </script>
+ </body>
+</html>
