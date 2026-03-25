@@ -345,7 +345,7 @@ function buildSidebar() {
     items.push({id:'manage_config', icon:'settings', label:'จัดการการตั้งค่า'});
     items.push({id:'add_type', icon:'plus-circle', label:'เพิ่มชนิดสินค้า'});
   }
-  items.push({id:'adjust_stock', icon:'plus-minus', label:'ปรับจำนวนสินค้า'});
+  items.push({id:'adjust_stock', icon:'arrow-up-down', label:'ปรับจำนวนสินค้า'});
   items.push({id:'daily_log', icon:'calendar', label:'สรุปรายวัน'});
   if (role==='owner'||role==='admin') {
     items.push({id:'reports', icon:'bar-chart-3', label:'รายงานสรุป'});
@@ -1139,7 +1139,7 @@ function renderAdjustStock(c) {
                   <td class="px-4 py-3 text-right font-semibold">${l.amount}</td>
                   <td class="px-4 py-3 text-center">
                     <button onclick="openEditLogModal('${l.__backendId}')" class="text-gray-400 hover:text-royal transition p-1" title="แก้ไขรายการนี้">
-                      <i data-lucide="edit-3" class="w-4 h-4"></i>
+                      <i data-lucide="pencil" class="w-4 h-4"></i>
                     </button>
                   </td>
                 </tr>
@@ -1414,7 +1414,7 @@ function renderDailyLog(c) {
                   <td class="px-4 py-3 text-gray-400 hidden md:table-cell">${l.note||'-'}</td>
                   <td class="px-4 py-3 text-center">
                     <button onclick="openEditLogModal('${l.__backendId}')" class="text-gray-400 hover:text-royal transition p-1" title="แก้ไขรายการนี้">
-                      <i data-lucide="edit-3" class="w-4 h-4"></i>
+                      <i data-lucide="pencil" class="w-4 h-4"></i>
                     </button>
                   </td>
                 </tr>
@@ -1776,16 +1776,19 @@ function renderManageUsers(c) {
       <div class="space-y-3" id="userListContainer">
         ${userList.map(u=>`
           <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full ${u.role==='admin'?'bg-coral':u.role==='owner'?'bg-royal':'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">${(u.employee||'?').charAt(0)}</div>
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-full ${u.role==='admin'?'bg-coral':u.role==='owner'?'bg-royal':'bg-gray-400'} text-white flex items-center justify-center font-bold text-lg">${(u.employee||'?').charAt(0).toUpperCase()}</div>
               <div>
-                <div class="font-medium">${u.employee}</div>
-                <div class="text-xs text-gray-400">${u.role==='admin'?'ผู้ดูแล':u.role==='owner'?'เจ้าของ':'พนักงาน'}</div>
+                <div class="font-bold text-ink text-base">${u.employee}</div>
+                <div class="text-xs text-gray-400 mb-1">${u.role==='admin'?'ผู้ดูแล':u.role==='owner'?'เจ้าของ':'พนักงาน'}</div>
+                <div class="text-sm text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md inline-block border border-gray-100">
+                  รหัสผ่าน: <span class="font-mono font-bold text-coral">${u.password}</span>
+                </div>
               </div>
             </div>
             <div class="flex gap-2">
-              ${u.employee!=='admin'?`<button onclick="openEditUserModal('${u.__backendId}')" class="text-gray-400 hover:text-royal transition p-1" title="แก้ไขข้อมูล"><i data-lucide="edit" class="w-4 h-4"></i></button>`:''}
-              ${u.employee!=='admin'?`<button onclick="deleteUser('${u.__backendId}')" class="text-gray-400 hover:text-coral transition p-1" title="ลบผู้ใช้"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`:''}
+              <button onclick="openEditUserModal('${u.__backendId}')" class="text-gray-400 hover:text-royal transition p-2 bg-gray-50 rounded-lg border border-transparent hover:border-royal/20" title="แก้ไขข้อมูลผู้ใช้นี้"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+              ${u.employee !== 'admin' && u.employee !== currentUser.employee ? `<button onclick="deleteUser('${u.__backendId}')" class="text-gray-400 hover:text-coral transition p-2 bg-gray-50 rounded-lg border border-transparent hover:border-coral/20" title="ลบผู้ใช้"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
             </div>
           </div>
         `).join('')||'<div class="text-gray-400 text-center py-8">ยังไม่มีผู้ใช้</div>'}
@@ -1986,6 +1989,13 @@ document.getElementById('editUserForm').onsubmit = async (e) => {
   btn.textContent = 'บันทึก';
 
   if (res.isOk) {
+    // หากแก้ไขข้อมูลของตัวเอง (ที่ล็อกอินอยู่) ให้อัปเดต UI ด้านบนด้วย
+    if(existingUser.employee === currentUser.employee) {
+      currentUser.employee = newName;
+      currentUser.role = newRole;
+      document.getElementById('userBadge').textContent = `${currentUser.employee} (${currentUser.role==='admin'?'ผู้ดูแล':currentUser.role==='owner'?'เจ้าของ':'พนักงาน'})`;
+    }
+    
     showToast('แก้ไขข้อมูลผู้ใช้สำเร็จ');
     closeEditUserModal();
   } else {
