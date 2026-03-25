@@ -105,6 +105,61 @@
     </div>
    </div>
 
+   <!-- Edit Log Modal -->
+   <div id="editLogModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 mobile-overlay">
+    <div class="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm fade-in">
+     <h3 class="font-bold text-lg mb-4 text-ink">แก้ไขรายการปรับสต็อก</h3>
+     <form id="editLogForm" class="space-y-4">
+      <input type="hidden" id="el_id">
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">รายการ</label>
+       <input id="el_title" type="text" disabled class="w-full border border-gray-200 bg-gray-50 rounded-xl px-4 py-2 text-sm text-gray-500">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+       <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">จำนวนเดิม</label>
+        <input id="el_old_amount" type="number" disabled class="w-full border border-gray-200 bg-gray-50 rounded-xl px-4 py-2 text-center text-gray-500">
+       </div>
+       <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">จำนวนใหม่</label>
+        <input id="el_new_amount" type="number" min="0" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50 text-center font-bold">
+       </div>
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-600 mb-1">หมายเหตุ</label>
+       <input id="el_note" type="text" class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral/50">
+      </div>
+      <div id="el_error" class="text-coral text-sm hidden"></div>
+      <div class="flex gap-3 pt-2">
+       <button type="button" onclick="closeEditLogModal()" class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium transition">ยกเลิก</button>
+       <button type="submit" id="el_btn" class="flex-1 px-4 py-2.5 rounded-xl bg-coral text-white font-medium hover:opacity-80 transition">บันทึก</button>
+      </div>
+     </form>
+    </div>
+   </div>
+
+   <!-- Employee Log Detail Modal -->
+   <div id="empLogModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 mobile-overlay">
+    <div class="bg-white rounded-2xl p-6 shadow-xl w-full max-w-4xl fade-in max-h-[90vh] flex flex-col">
+     <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-lg text-ink font-display" id="empLogModalTitle">ประวัติการทำงาน</h3>
+      <button onclick="closeEmpLogModal()" class="text-gray-400 hover:text-coral transition"><i data-lucide="x" class="w-6 h-6"></i></button>
+     </div>
+     <div class="overflow-y-auto flex-1 sidebar-scroll bg-gray-50 rounded-xl border border-gray-100">
+      <table class="w-full text-sm">
+       <thead class="bg-white text-gray-500 sticky top-0 shadow-sm"><tr>
+        <th class="px-4 py-3 text-left border-b border-gray-100">วัน-เวลา</th>
+        <th class="px-4 py-3 text-left border-b border-gray-100">รายการ</th>
+        <th class="px-4 py-3 text-center border-b border-gray-100">การกระทำ</th>
+        <th class="px-4 py-3 text-right border-b border-gray-100">จำนวน</th>
+        <th class="px-4 py-3 text-left border-b border-gray-100 hidden md:table-cell">หมายเหตุ</th>
+       </tr></thead>
+       <tbody id="empLogModalBody"></tbody>
+      </table>
+     </div>
+    </div>
+   </div>
+
    <!-- Login Screen -->
    <div id="loginScreen" class="h-full flex items-center justify-center p-4" style="background: linear-gradient(135deg, #fff5f8 0%, #fce4ec 50%, #f8bbd0 100%);">
     <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm fade-in">
@@ -1010,9 +1065,13 @@ function renderAddType(c) {
 function renderAdjustStock(c) {
   const templates = getTemplates();
   let currentMode = 'add'; 
+  const myLogs = getLogs()
+    .filter(l => l.date && l.date.startsWith(todayStr()) && l.employee === currentUser.employee)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
 
   c.innerHTML = `
-    <div class="fade-in max-w-3xl mx-auto">
+    <div class="fade-in max-w-4xl mx-auto">
       <h2 class="font-display text-2xl font-bold mb-6">จัดการเพิ่ม/ลดสต็อก</h2>
       
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
@@ -1055,6 +1114,40 @@ function renderAdjustStock(c) {
             บันทึกการเพิ่มสต็อก
           </button>
         </form>
+      </div>
+
+      <!-- ประวัติล่าสุด -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h3 class="font-semibold mb-4 text-ink flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-gray-400"></i> ประวัติการทำรายการล่าสุดของคุณ (วันนี้)</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500"><tr>
+              <th class="px-4 py-3 text-left">เวลา</th>
+              <th class="px-4 py-3 text-left">รายการ</th>
+              <th class="px-4 py-3 text-center">การกระทำ</th>
+              <th class="px-4 py-3 text-right">จำนวน</th>
+              <th class="px-4 py-3 text-center w-16">จัดการ</th>
+            </tr></thead>
+            <tbody>
+              ${myLogs.length ? myLogs.map(l => {
+                const time = new Date(l.date).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
+                return `
+                <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                  <td class="px-4 py-3 text-gray-500">${time}</td>
+                  <td class="px-4 py-3">${l.category} ${l.style} ${l.color} ไซส์ ${l.size}</td>
+                  <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded-full text-xs ${l.action==='add'?'bg-green-100 text-green-700':'bg-red-100 text-coral'}">${l.action==='add'?'เพิ่ม':'ใช้'}</span></td>
+                  <td class="px-4 py-3 text-right font-semibold">${l.amount}</td>
+                  <td class="px-4 py-3 text-center">
+                    <button onclick="openEditLogModal('${l.__backendId}')" class="text-gray-400 hover:text-royal transition p-1" title="แก้ไขรายการนี้">
+                      <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    </button>
+                  </td>
+                </tr>
+                `;
+              }).join('') : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">ยังไม่มีรายการในวันนี้</td></tr>'}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>`;
 
@@ -1269,10 +1362,7 @@ function renderAdjustStock(c) {
       btn.disabled=false;
       btn.textContent=originalText;
       
-      document.getElementById('adjustForm').reset();
-      searchEl.value = '';
-      renderOptions();
-      document.getElementById('sizeInputsContainer').classList.add('hidden');
+      renderPage();
     } catch (err) {
       errEl.textContent = err.message || 'เกิดข้อผิดพลาดในการบันทึก';
       errEl.classList.remove('hidden');
@@ -1293,7 +1383,7 @@ function renderDailyLog(c) {
   const reduceCount = myLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(l.amount||0),0);
 
   c.innerHTML = `
-    <div class="fade-in max-w-3xl mx-auto">
+    <div class="fade-in max-w-4xl mx-auto">
       <h2 class="font-display text-2xl font-bold mb-4">สรุปรายวัน - ${currentUser.employee}</h2>
       <div class="grid grid-cols-2 gap-4 mb-6">
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
@@ -1306,27 +1396,136 @@ function renderDailyLog(c) {
         </div>
       </div>
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-500"><tr>
-            <th class="px-4 py-3 text-left">รายการ</th>
-            <th class="px-4 py-3 text-center">การกระทำ</th>
-            <th class="px-4 py-3 text-right">จำนวน</th>
-            <th class="px-4 py-3 text-left hidden md:table-cell">หมายเหตุ</th>
-          </tr></thead>
-          <tbody>
-            ${myLogs.length?myLogs.reverse().map(l=>`
-              <tr class="border-b border-gray-50">
-                <td class="px-4 py-3">${l.category} ${l.style} ${l.color} ${l.size}</td>
-                <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded-full text-xs ${l.action==='add'?'bg-green-100 text-green-700':'bg-red-100 text-coral'}">${l.action==='add'?'เพิ่ม':'ใช้'}</span></td>
-                <td class="px-4 py-3 text-right font-semibold">${l.amount}</td>
-                <td class="px-4 py-3 text-gray-400 hidden md:table-cell">${l.note||'-'}</td>
-              </tr>
-            `).join(''):'<tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">ยังไม่มีกิจกรรมวันนี้</td></tr>'}
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500"><tr>
+              <th class="px-4 py-3 text-left">รายการ</th>
+              <th class="px-4 py-3 text-center">การกระทำ</th>
+              <th class="px-4 py-3 text-right">จำนวน</th>
+              <th class="px-4 py-3 text-left hidden md:table-cell">หมายเหตุ</th>
+              <th class="px-4 py-3 text-center w-16">จัดการ</th>
+            </tr></thead>
+            <tbody>
+              ${myLogs.length?myLogs.reverse().map(l=>`
+                <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                  <td class="px-4 py-3">${l.category} ${l.style} ${l.color} ไซส์ ${l.size}</td>
+                  <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded-full text-xs ${l.action==='add'?'bg-green-100 text-green-700':'bg-red-100 text-coral'}">${l.action==='add'?'เพิ่ม':'ใช้'}</span></td>
+                  <td class="px-4 py-3 text-right font-semibold">${l.amount}</td>
+                  <td class="px-4 py-3 text-gray-400 hidden md:table-cell">${l.note||'-'}</td>
+                  <td class="px-4 py-3 text-center">
+                    <button onclick="openEditLogModal('${l.__backendId}')" class="text-gray-400 hover:text-royal transition p-1" title="แก้ไขรายการนี้">
+                      <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    </button>
+                  </td>
+                </tr>
+              `).join(''):'<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">ยังไม่มีกิจกรรมวันนี้</td></tr>'}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>`;
 }
+
+// ===== EDIT LOG LOGIC =====
+window.openEditLogModal = (id) => {
+  const log = getLogs().find(l => l.__backendId === id);
+  if(!log) return;
+  document.getElementById('el_id').value = log.__backendId;
+  document.getElementById('el_title').value = `${log.action==='add'?'เพิ่ม':'ใช้'} ${log.category} ${log.style} ${log.color} ไซส์ ${log.size}`;
+  document.getElementById('el_old_amount').value = log.amount;
+  document.getElementById('el_new_amount').value = log.amount;
+  document.getElementById('el_note').value = log.note || '';
+  document.getElementById('el_error').classList.add('hidden');
+  document.getElementById('editLogModal').classList.remove('hidden');
+};
+
+window.closeEditLogModal = () => {
+  document.getElementById('editLogModal').classList.add('hidden');
+  document.getElementById('editLogForm').reset();
+};
+
+document.getElementById('editLogForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('el_id').value;
+  const newAmount = parseInt(document.getElementById('el_new_amount').value);
+  const newNote = document.getElementById('el_note').value.trim();
+  const errEl = document.getElementById('el_error');
+
+  if(isNaN(newAmount) || newAmount < 0) {
+    errEl.textContent = 'กรุณาระบุจำนวนให้ถูกต้อง (ต้องไม่ติดลบ)';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const logRec = getLogs().find(l => l.__backendId === id);
+  if(!logRec) return;
+
+  const oldAmount = parseInt(logRec.amount) || 0;
+
+  if(newAmount === oldAmount && newNote === logRec.note) {
+    closeEditLogModal();
+    return;
+  }
+
+  let stockRec = getTemplateStocks(logRec.template_id).find(s => s.size === logRec.size);
+  if(!stockRec) {
+    stockRec = getStocks().find(s => s.category === logRec.category && s.style === logRec.style && s.color === logRec.color && s.size === logRec.size);
+  }
+
+  if(!stockRec) {
+    errEl.textContent = 'ไม่พบข้อมูลสต็อกต้นทาง ไม่สามารถแก้ไขได้';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const diff = newAmount - oldAmount;
+  let newStockQty = parseInt(stockRec.quantity) || 0;
+
+  if(logRec.action === 'add') {
+    newStockQty += diff; 
+  } else {
+    newStockQty -= diff; 
+  }
+
+  if(newStockQty < 0) {
+    errEl.textContent = `ยอดสต็อกคงเหลือจะติดลบ (${newStockQty}) หากแก้ไขด้วยจำนวนนี้`;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  errEl.classList.add('hidden');
+  const btn = document.getElementById('el_btn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+
+  try {
+    if(diff !== 0) {
+      const sRes = await window.dataSdk.update({...stockRec, quantity: newStockQty});
+      if(!sRes.isOk) throw new Error('อัปเดตสต็อกสินค้าหลักไม่สำเร็จ');
+    }
+    
+    // เพิ่ม edited_at และเก็บค่าเดิมเพื่อใช้แสดงผลในประวัติ
+    const lRes = await window.dataSdk.update({
+      ...logRec, 
+      amount: newAmount, 
+      note: newNote,
+      edited_at: new Date().toISOString(),
+      old_amount: oldAmount,
+      old_note: logRec.note || ''
+    });
+    if(!lRes.isOk) throw new Error('อัปเดตรายการรายวันไม่สำเร็จ');
+
+    showToast('แก้ไขรายการสำเร็จ');
+    closeEditLogModal();
+    renderPage();
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'บันทึก';
+  }
+};
 
 // ===== REPORTS (Owner/Admin) =====
 function renderReports(c) {
@@ -1395,34 +1594,164 @@ function renderReports(c) {
 }
 
 // ===== EMPLOYEE SUMMARY (Owner/Admin) =====
+window.currentEmpFilter = window.currentEmpFilter || 'today';
+window.customEmpDate = window.customEmpDate || '';
+
 function renderEmpSummary(c) {
-  const todayLogs = getLogs().filter(l=>l.date&&l.date.startsWith(todayStr()));
+  const allLogs = getLogs();
+  let filteredLogs = [];
+  const now = new Date();
+
+  // กรองข้อมูลตามช่วงเวลา (รวมถึงเลือกวันเฉพาะเจาะจง)
+  if(window.currentEmpFilter === 'today') {
+    filteredLogs = allLogs.filter(l => l.date && l.date.startsWith(todayStr()));
+  } else if(window.currentEmpFilter === 'month') {
+    const m = now.toISOString().slice(0,7);
+    filteredLogs = allLogs.filter(l => l.date && l.date.startsWith(m));
+  } else if(window.currentEmpFilter === 'custom' && window.customEmpDate) {
+    filteredLogs = allLogs.filter(l => l.date && l.date.startsWith(window.customEmpDate));
+  } else {
+    filteredLogs = allLogs; // 'all'
+  }
+
   const empMap = {};
-  todayLogs.forEach(l=>{
-    if(!empMap[l.employee]) empMap[l.employee]={add:0,reduce:0};
-    if(l.action==='add') empMap[l.employee].add+=(l.amount||0);
-    else empMap[l.employee].reduce+=(l.amount||0);
+  
+  // ดึงรายชื่อผู้ใช้ทั้งหมดมาแสดง (ยกเว้น admin หลักที่อาจไม่ได้ทำรายการสต็อก)
+  getUsers().forEach(u => {
+    if(u.employee !== 'admin') { 
+      empMap[u.employee] = {add:0, reduce:0};
+    }
   });
 
+  filteredLogs.forEach(l => {
+    if(!empMap[l.employee]) empMap[l.employee] = {add:0, reduce:0};
+    if(l.action === 'add') empMap[l.employee].add += (l.amount || 0);
+    else if(l.action === 'reduce') empMap[l.employee].reduce += (l.amount || 0);
+  });
+
+  // สไตล์ปุ่มตัวกรอง
+  const btnClass = "px-4 py-2 rounded-full text-sm transition ";
+  const activeClass = btnClass + "bg-coral text-white shadow-md font-medium";
+  const inactiveClass = btnClass + "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 font-medium";
+
   c.innerHTML = `
-    <div class="fade-in max-w-3xl mx-auto">
-      <h2 class="font-display text-2xl font-bold mb-4">สรุปพนักงานรายวัน</h2>
+    <div class="fade-in max-w-4xl mx-auto">
+      <h2 class="font-display text-2xl font-bold mb-4">สรุปการทำงานของพนักงาน</h2>
+      
+      <!-- ตัวกรองเวลา -->
+      <div class="flex flex-col md:flex-row gap-3 mb-6 items-start md:items-center justify-between">
+        <div class="flex flex-wrap gap-2">
+          <button onclick="setEmpFilter('today')" class="${window.currentEmpFilter==='today'?activeClass:inactiveClass}">วันนี้</button>
+          <button onclick="setEmpFilter('month')" class="${window.currentEmpFilter==='month'?activeClass:inactiveClass}">เดือนนี้</button>
+          <button onclick="setEmpFilter('all')" class="${window.currentEmpFilter==='all'?activeClass:inactiveClass}">ทั้งหมดย้อนหลัง</button>
+        </div>
+        <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm transition-all focus-within:border-coral focus-within:ring-2 focus-within:ring-coral/20">
+          <i data-lucide="calendar" class="w-4 h-4 text-gray-400"></i>
+          <span class="text-sm font-medium text-gray-600 whitespace-nowrap">เลือกวันที่:</span>
+          <input type="date" id="empCustomDate" value="${window.currentEmpFilter==='custom'?window.customEmpDate:''}" class="bg-transparent border-none text-sm focus:ring-0 text-ink outline-none cursor-pointer w-[120px]" onchange="setEmpFilter('custom', this.value)">
+        </div>
+      </div>
+
       <div class="space-y-3">
-        ${Object.keys(empMap).length?Object.entries(empMap).map(([name,data])=>`
-          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-royal text-white flex items-center justify-center font-bold">${name.charAt(0)}</div>
-              <span class="font-medium">${name}</span>
+        ${Object.keys(empMap).length ? Object.entries(empMap).map(([name, data]) => `
+          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between card-hover cursor-pointer gap-4 transition hover:border-coral/30" onclick="openEmpLogModal('${name}')">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-full bg-navy text-coral flex items-center justify-center font-bold text-xl shadow-inner">${name.charAt(0).toUpperCase()}</div>
+              <div>
+                <div class="font-bold text-lg text-ink flex items-center gap-2">${name}</div>
+                <div class="text-xs text-coral mt-0.5 flex items-center gap-1"><i data-lucide="search" class="w-3 h-3"></i> คลิกเพื่อดูประวัติแบบละเอียด</div>
+              </div>
             </div>
-            <div class="flex gap-4 text-sm">
-              <span class="text-green-600 font-semibold">+${data.add}</span>
-              <span class="text-coral font-semibold">-${data.reduce}</span>
+            <div class="flex gap-4 sm:gap-6 text-sm bg-gray-50 px-4 py-2 rounded-xl border border-gray-100 w-full sm:w-auto justify-center sm:justify-end">
+              <div class="text-center px-2">
+                <div class="text-xs text-gray-400 mb-0.5 font-medium">เพิ่มเข้า (ชิ้น)</div>
+                <div class="text-green-600 font-bold text-lg">+${data.add}</div>
+              </div>
+              <div class="w-px bg-gray-200"></div>
+              <div class="text-center px-2">
+                <div class="text-xs text-gray-400 mb-0.5 font-medium">เบิกออก (ชิ้น)</div>
+                <div class="text-coral font-bold text-lg">-${data.reduce}</div>
+              </div>
             </div>
           </div>
-        `).join(''):'<div class="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm">ยังไม่มีกิจกรรมวันนี้</div>'}
+        `).join('') : '<div class="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm">ไม่มีข้อมูลพนักงาน</div>'}
       </div>
     </div>`;
+    lucide.createIcons();
 }
+
+window.setEmpFilter = (f, val = '') => {
+  window.currentEmpFilter = f;
+  if(f === 'custom') {
+    window.customEmpDate = val;
+  }
+  renderPage();
+};
+
+// ===== LOGIC สำหรับ Modal ประวัติพนักงาน =====
+window.openEmpLogModal = (empName) => {
+  document.getElementById('empLogModalTitle').innerHTML = `<i data-lucide="history" class="w-5 h-5 inline-block mr-2 align-text-bottom text-coral"></i>ประวัติการทำงาน: <span class="text-coral">${empName}</span>`;
+  const tbody = document.getElementById('empLogModalBody');
+
+  const allLogs = getLogs();
+  let filteredLogs = allLogs.filter(l => l.employee === empName);
+
+  // กรอง log ใน modal ตามช่วงเวลาที่กดเลือกไว้ข้างนอก
+  if(window.currentEmpFilter === 'today') {
+    filteredLogs = filteredLogs.filter(l => l.date && l.date.startsWith(todayStr()));
+  } else if(window.currentEmpFilter === 'month') {
+    const m = new Date().toISOString().slice(0,7);
+    filteredLogs = filteredLogs.filter(l => l.date && l.date.startsWith(m));
+  } else if(window.currentEmpFilter === 'custom' && window.customEmpDate) {
+    filteredLogs = filteredLogs.filter(l => l.date && l.date.startsWith(window.customEmpDate));
+  }
+
+  // เรียงจากใหม่ไปเก่า
+  filteredLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  tbody.innerHTML = filteredLogs.length ? filteredLogs.map(l => {
+    const dt = new Date(l.date);
+    const dateStr = dt.toLocaleDateString('th-TH', {day:'2-digit', month:'short', year:'2-digit'});
+    const timeStr = dt.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
+    
+    // ตรวจสอบว่ามี field edited_at หรือไม่ (เกิดจากการกดแก้ไข)
+    const editedBadge = l.edited_at ? `<div class="text-[10px] text-orange-500 mt-1 font-medium"><i data-lucide="edit-2" class="w-3 h-3 inline-block"></i> แก้ไขแล้ว</div>` : '';
+    
+    // แสดงตัวเลขเดิมที่ถูกขีดฆ่า หากเคยมีการแก้ไข
+    const oldAmountHtml = (l.old_amount !== undefined && l.old_amount !== l.amount) ? `<div class="text-xs text-gray-400 line-through mb-0.5" title="จำนวนก่อนแก้ไข">${l.old_amount}</div>` : '';
+
+    return `
+      <tr class="border-b border-gray-100 hover:bg-white transition bg-gray-50/50">
+        <td class="px-4 py-3 whitespace-nowrap align-top">
+          <div class="font-bold text-ink">${dateStr}</div>
+          <div class="text-xs text-gray-500 font-medium">${timeStr} น.</div>
+        </td>
+        <td class="px-4 py-3 font-medium text-ink align-top">${l.category} ${l.style} ${l.color} <span class="text-coral">ไซส์ ${l.size}</span></td>
+        <td class="px-4 py-3 text-center align-top">
+          <span class="px-2 py-1 rounded-full text-xs font-semibold ${l.action==='add'?'bg-green-100 text-green-700':'bg-red-100 text-coral'}">
+            ${l.action==='add'?'เพิ่ม':'ใช้'}
+          </span>
+          ${editedBadge}
+        </td>
+        <td class="px-4 py-3 text-right align-top">
+          ${oldAmountHtml}
+          <div class="font-bold text-lg ${l.action==='add'?'text-green-600':'text-coral'}">${l.amount}</div>
+        </td>
+        <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell max-w-[150px] truncate align-top" title="${l.note||'-'}">
+          ${l.old_note ? `<div class="line-through text-gray-300 mb-0.5">${l.old_note}</div>` : ''}
+          ${l.note||'-'}
+        </td>
+      </tr>
+    `;
+  }).join('') : '<tr><td colspan="5" class="px-4 py-12 text-center text-gray-400 bg-white">ไม่มีประวัติการทำรายการในช่วงเวลานี้</td></tr>';
+
+  document.getElementById('empLogModal').classList.remove('hidden');
+  lucide.createIcons();
+};
+
+window.closeEmpLogModal = () => {
+  document.getElementById('empLogModal').classList.add('hidden');
+};
 
 // ===== MANAGE USERS (Admin) =====
 function renderManageUsers(c) {
