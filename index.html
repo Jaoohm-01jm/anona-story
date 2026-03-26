@@ -241,42 +241,126 @@ if (typeof window.dataSdk === 'undefined') {
   window._mockDataHandler = null;
   window.dataSdk = {
     init: async function(handler) {
-      console.warn("Data SDK not found. Using in-memory fallback.");
+      console.log("Initializing Firebase Data SDK...");
       window._mockDataHandler = handler;
-      if (handler && handler.onDataChanged) {
-        handler.onDataChanged(allRecords);
+
+      try {
+        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+        const { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+        const { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+        let firebaseConfig = null;
+
+        if (typeof __firebase_config !== 'undefined') {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            // === 🚨 นำ Firebase Config ของคุณมาวางตรงนี้ 🚨 ===
+            firebaseConfig = {
+                apiKey: "AIzaSyDJFa5SDbNeI4evmt8tiW_VhwrgCwz13pA",
+                authDomain: "anona-stock.firebaseapp.com",
+                projectId: "anona-stock",
+                storageBucket: "anona-stock.firebasestorage.app",
+                messagingSenderId: "242342005638",
+                appId: "1:242342005638:web:8d7b56aa9f9d4e85757a07",
+                measurementId: "G-0NQHHNK49F"
+            };
+            // =================================================================
+        }
+
+        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+            console.warn("ยังไม่ได้ตั้งค่า Firebase Config! กำลังทำงานในโหมดออฟไลน์ (ข้อมูลจะไม่ซิงค์)");
+            if (handler && handler.onDataChanged) handler.onDataChanged(allRecords);
+            return { isOk: true };
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        window._db = getFirestore(app);
+        window._appId = typeof __app_id !== 'undefined' ? __app_id : 'anona-story-database';
+
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+
+        return new Promise((resolve) => {
+            onAuthStateChanged(auth, (user) => {
+                window._currentUserUid = user ? user.uid : null;
+                if (user) {
+                    const colRef = collection(window._db, 'artifacts', window._appId, 'public', 'data', 'records');
+                    onSnapshot(colRef, (snapshot) => {
+                        const records = [];
+                        snapshot.forEach(docSnap => {
+                            records.push({ ...docSnap.data(), __backendId: docSnap.id });
+                        });
+                        allRecords = records;
+                        if (window._mockDataHandler && window._mockDataHandler.onDataChanged) {
+                            window._mockDataHandler.onDataChanged(records);
+                        }
+                    }, (error) => {
+                        console.error("Firestore error:", error);
+                    });
+                    resolve({ isOk: true });
+                }
+            });
+        });
+
+      } catch(e) {
+          console.error("Firebase Init Error:", e);
+          return { isOk: false, error: e };
       }
-      return { isOk: true };
     },
     create: async function(data) {
-      const newRecord = { ...data, __backendId: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
-      allRecords.push(newRecord);
-      if (window._mockDataHandler && window._mockDataHandler.onDataChanged) {
-        window._mockDataHandler.onDataChanged([...allRecords]);
-      }
-      return { isOk: true, data: newRecord, record: newRecord };
+        if (!window._db || !window._currentUserUid) {
+            const newRecord = { ...data, __backendId: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
+            allRecords.push(newRecord);
+            if (window._mockDataHandler && window._mockDataHandler.onDataChanged) window._mockDataHandler.onDataChanged([...allRecords]);
+            return { isOk: true, data: newRecord, record: newRecord };
+        }
+        try {
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+            const docRef = doc(window._db, 'artifacts', window._appId, 'public', 'data', 'records', newId);
+            await setDoc(docRef, data);
+            return { isOk: true, data: { ...data, __backendId: newId }, record: { ...data, __backendId: newId } };
+        } catch(e) { return { isOk: false, error: e }; }
     },
     update: async function(data) {
-      const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
-      if (idx > -1) {
-        allRecords[idx] = { ...data };
-        if (window._mockDataHandler && window._mockDataHandler.onDataChanged) {
-          window._mockDataHandler.onDataChanged([...allRecords]);
+        if (!window._db || !window._currentUserUid) {
+            const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
+            if (idx > -1) {
+                allRecords[idx] = { ...data };
+                if (window._mockDataHandler && window._mockDataHandler.onDataChanged) window._mockDataHandler.onDataChanged([...allRecords]);
+                return { isOk: true };
+            }
+            return { isOk: false, error: 'Record not found' };
         }
-        return { isOk: true };
-      }
-      return { isOk: false, error: 'Record not found' };
+        try {
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            const docRef = doc(window._db, 'artifacts', window._appId, 'public', 'data', 'records', data.__backendId);
+            const updateData = { ...data };
+            delete updateData.__backendId;
+            await setDoc(docRef, updateData, { merge: true });
+            return { isOk: true };
+        } catch(e) { return { isOk: false, error: e }; }
     },
     delete: async function(data) {
-      const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
-      if (idx > -1) {
-        allRecords.splice(idx, 1);
-        if (window._mockDataHandler && window._mockDataHandler.onDataChanged) {
-          window._mockDataHandler.onDataChanged([...allRecords]);
+        if (!window._db || !window._currentUserUid) {
+            const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
+            if (idx > -1) {
+                allRecords.splice(idx, 1);
+                if (window._mockDataHandler && window._mockDataHandler.onDataChanged) window._mockDataHandler.onDataChanged([...allRecords]);
+                return { isOk: true };
+            }
+            return { isOk: false, error: 'Record not found' };
         }
-        return { isOk: true };
-      }
-      return { isOk: false, error: 'Record not found' };
+        try {
+            const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            const docRef = doc(window._db, 'artifacts', window._appId, 'public', 'data', 'records', data.__backendId);
+            await deleteDoc(docRef);
+            return { isOk: true };
+        } catch(e) { return { isOk: false, error: e }; }
     }
   };
 }
@@ -410,13 +494,13 @@ function renderDashboard(c) {
   getStocks().forEach(s => {
     const tpl = getTemplates().find(t => t.__backendId === s.template_id);
     if (tpl && summary[tpl.category] !== undefined) {
-      summary[tpl.category] += (s.quantity || 0);
+      summary[tpl.category] += (parseInt(s.quantity) || 0);
     }
   });
   const total = Object.values(summary).reduce((a,b)=>a+b,0);
-  const todayLogs = getLogs().filter(l=>l.date===todayStr());
-  const todayIn = todayLogs.filter(l=>l.action==='add').reduce((a,l)=>a+(l.amount||0),0);
-  const todayOut = todayLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(l.amount||0),0);
+  const todayLogs = getLogs().filter(l=>l.date&&l.date.startsWith(todayStr()));
+  const todayIn = todayLogs.filter(l=>l.action==='add').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
+  const todayOut = todayLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
 
   c.innerHTML = `
     <div class="fade-in max-w-5xl mx-auto">
@@ -444,7 +528,7 @@ function renderDashboard(c) {
       </div>
       <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
         <h3 class="font-semibold mb-3">กิจกรรมล่าสุด</h3>
-        <div class="space-y-2 max-h-64 overflow-y-auto">
+        <div class="space-y-2 max-h-64 overflow-y-auto pr-2 sidebar-scroll">
           ${todayLogs.slice(-10).reverse().map(l=>`
             <div class="flex items-center justify-between py-2 border-b border-gray-50 text-sm">
               <div><span class="inline-block w-2 h-2 rounded-full ${l.action==='add'?'bg-green-500':'bg-coral'} mr-2"></span>${l.category} ${l.style} ${l.color} ${l.size}</div>
@@ -698,25 +782,23 @@ async function saveConfig() {
       size: JSON.stringify(SIZES)
     });
   } else {
-    if(allRecords.length < 999) {
-      await window.dataSdk.create({
-        type: 'config',
-        category: JSON.stringify(CATEGORIES),
-        style: JSON.stringify(STYLES),
-        color: JSON.stringify(COLORS),
-        size: JSON.stringify(SIZES),
-        quantity: 0,
-        action: '',
-        amount: 0,
-        employee: '',
-        role: '',
-        password: '',
-        date: '',
-        note: '',
-        template_id: '',
-        sizes_json: ''
-      });
-    }
+    await window.dataSdk.create({
+      type: 'config',
+      category: JSON.stringify(CATEGORIES),
+      style: JSON.stringify(STYLES),
+      color: JSON.stringify(COLORS),
+      size: JSON.stringify(SIZES),
+      quantity: 0,
+      action: '',
+      amount: 0,
+      employee: '',
+      role: '',
+      password: '',
+      date: '',
+      note: '',
+      template_id: '',
+      sizes_json: ''
+    });
   }
 }
 
@@ -972,14 +1054,6 @@ function renderAddType(c) {
           return;
         }
 
-        if (allRecords.length >= 999) {
-          errEl.textContent = 'ข้อมูลเต็มแล้ว (999 รายการ)';
-          errEl.classList.remove('hidden');
-          btn.disabled = false;
-          btn.textContent = 'สร้างชนิดสินค้า';
-          return;
-        }
-
         const templateRes = await window.dataSdk.create({
           type: 'template',
           category: cat,
@@ -1016,8 +1090,6 @@ function renderAddType(c) {
         
         if (newTemplateId) {
           for (const size of selectedSizes[color]) {
-            if (allRecords.length >= 999) break;
-            
             await window.dataSdk.create({
               type: 'stock',
               category: cat,
@@ -1219,7 +1291,7 @@ function renderAdjustStock(c) {
 
     const tplStocks = getTemplateStocks(templateId);
     const stockMap = {};
-    tplStocks.forEach(s => stockMap[s.size] = s.quantity || 0);
+    tplStocks.forEach(s => stockMap[s.size] = parseInt(s.quantity) || 0);
 
     let allowedSizes = SIZES;
     if (template.sizes_json) {
@@ -1283,7 +1355,7 @@ function renderAdjustStock(c) {
     if (currentMode === 'reduce') {
         for (const [size, amount] of Object.entries(adjustments)) {
             const existingStock = tplStocks.find(s => s.size === size);
-            const currentQty = existingStock ? (existingStock.quantity || 0) : 0;
+            const currentQty = existingStock ? (parseInt(existingStock.quantity) || 0) : 0;
             if (amount > currentQty) {
                 errEl.textContent = `จำนวนที่ระบุ (ไซส์ ${size}) มากกว่าสต็อกที่มีอยู่ (มี ${currentQty})`;
                 errEl.classList.remove('hidden');
@@ -1304,7 +1376,7 @@ function renderAdjustStock(c) {
         let newQty = 0;
         
         if (existingStock) {
-          const oldQty = existingStock.quantity || 0;
+          const oldQty = parseInt(existingStock.quantity) || 0;
           newQty = currentMode === 'add' ? oldQty + amount : oldQty - amount;
 
           const updateRes = await window.dataSdk.update({
@@ -1315,8 +1387,6 @@ function renderAdjustStock(c) {
           if (!updateRes.isOk) throw new Error(`อัปเดตสต็อกไซส์ ${size} ไม่สำเร็จ`);
         } else if (currentMode === 'add') {
           newQty = amount;
-          if (allRecords.length >= 999) throw new Error('ข้อมูลเต็มแล้ว (999 รายการ)');
-          
           const createRes = await window.dataSdk.create({
             type:'stock',
             category:template.category,
@@ -1337,32 +1407,30 @@ function renderAdjustStock(c) {
           if (!createRes.isOk) throw new Error(`สร้างสต็อกไซส์ ${size} ไม่สำเร็จ`);
         }
 
-        if (allRecords.length < 999) {
-          await window.dataSdk.create({
-            type:'log',
-            category:template.category,
-            style:template.style,
-            color:template.color,
-            size,
-            quantity:0,
-            action: currentMode,
-            amount: amount,
-            employee:currentUser.employee,
-            role:currentUser.role,
-            password:'',
-            date:new Date().toISOString(),
-            note: note || (currentMode === 'add' ? 'เพิ่มจำนวนสินค้า' : 'เบิกออก/ใช้สินค้า'),
-            template_id:templateId,
-            sizes_json:''
-          });
-        }
+        await window.dataSdk.create({
+          type:'log',
+          category:template.category,
+          style:template.style,
+          color:template.color,
+          size,
+          quantity:0,
+          action: currentMode,
+          amount: amount,
+          employee:currentUser.employee,
+          role:currentUser.role,
+          password:'',
+          date:new Date().toISOString(),
+          note: note || (currentMode === 'add' ? 'เพิ่มจำนวนสินค้า' : 'เบิกออก/ใช้สินค้า'),
+          template_id:templateId,
+          sizes_json:''
+        });
       }
 
       showToast(currentMode === 'add' ? 'เพิ่มสต็อกสำเร็จ' : 'ลดสต็อกสำเร็จ');
       btn.disabled=false;
       btn.textContent=originalText;
       
-      renderPage();
+      renderPage(); // Refresh view including history
     } catch (err) {
       errEl.textContent = err.message || 'เกิดข้อผิดพลาดในการบันทึก';
       errEl.classList.remove('hidden');
@@ -1379,8 +1447,8 @@ function renderAdjustStock(c) {
 function renderDailyLog(c) {
   const today = todayStr();
   const myLogs = getLogs().filter(l=> l.date && l.date.startsWith(today) && l.employee===currentUser.employee);
-  const addCount = myLogs.filter(l=>l.action==='add').reduce((a,l)=>a+(l.amount||0),0);
-  const reduceCount = myLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(l.amount||0),0);
+  const addCount = myLogs.filter(l=>l.action==='add').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
+  const reduceCount = myLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
 
   c.innerHTML = `
     <div class="fade-in max-w-4xl mx-auto">
@@ -1504,7 +1572,6 @@ document.getElementById('editLogForm').onsubmit = async (e) => {
       if(!sRes.isOk) throw new Error('อัปเดตสต็อกสินค้าหลักไม่สำเร็จ');
     }
     
-    // เพิ่ม edited_at และเก็บค่าเดิมเพื่อใช้แสดงผลในประวัติ
     const lRes = await window.dataSdk.update({
       ...logRec, 
       amount: newAmount, 
@@ -1553,15 +1620,15 @@ function renderReports(c) {
     else if(p==='month') { const m = now.toISOString().slice(0,7); filtered = allLogs.filter(l=>l.date&&l.date.startsWith(m)); }
     else { const y = now.getFullYear().toString(); filtered = allLogs.filter(l=>l.date&&l.date.startsWith(y)); }
 
-    const addTotal = filtered.filter(l=>l.action==='add').reduce((a,l)=>a+(l.amount||0),0);
-    const reduceTotal = filtered.filter(l=>l.action==='reduce').reduce((a,l)=>a+(l.amount||0),0);
+    const addTotal = filtered.filter(l=>l.action==='add').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
+    const reduceTotal = filtered.filter(l=>l.action==='reduce').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
 
     const catGroup = {};
     CATEGORIES.forEach(cat=>catGroup[cat]={add:0,reduce:0});
     filtered.forEach(l=>{
       if(catGroup[l.category]) {
-        if(l.action==='add') catGroup[l.category].add+=(l.amount||0);
-        else catGroup[l.category].reduce+=(l.amount||0);
+        if(l.action==='add') catGroup[l.category].add+=(parseInt(l.amount)||0);
+        else catGroup[l.category].reduce+=(parseInt(l.amount)||0);
       }
     });
 
@@ -1602,7 +1669,6 @@ function renderEmpSummary(c) {
   let filteredLogs = [];
   const now = new Date();
 
-  // กรองข้อมูลตามช่วงเวลา (รวมถึงเลือกวันเฉพาะเจาะจง)
   if(window.currentEmpFilter === 'today') {
     filteredLogs = allLogs.filter(l => l.date && l.date.startsWith(todayStr()));
   } else if(window.currentEmpFilter === 'month') {
@@ -1611,12 +1677,10 @@ function renderEmpSummary(c) {
   } else if(window.currentEmpFilter === 'custom' && window.customEmpDate) {
     filteredLogs = allLogs.filter(l => l.date && l.date.startsWith(window.customEmpDate));
   } else {
-    filteredLogs = allLogs; // 'all'
+    filteredLogs = allLogs; 
   }
 
   const empMap = {};
-  
-  // ดึงรายชื่อผู้ใช้ทั้งหมดมาแสดง (ยกเว้น admin หลักที่อาจไม่ได้ทำรายการสต็อก)
   getUsers().forEach(u => {
     if(u.employee !== 'admin') { 
       empMap[u.employee] = {add:0, reduce:0};
@@ -1625,11 +1689,10 @@ function renderEmpSummary(c) {
 
   filteredLogs.forEach(l => {
     if(!empMap[l.employee]) empMap[l.employee] = {add:0, reduce:0};
-    if(l.action === 'add') empMap[l.employee].add += (l.amount || 0);
-    else if(l.action === 'reduce') empMap[l.employee].reduce += (l.amount || 0);
+    if(l.action === 'add') empMap[l.employee].add += (parseInt(l.amount) || 0);
+    else if(l.action === 'reduce') empMap[l.employee].reduce += (parseInt(l.amount) || 0);
   });
 
-  // สไตล์ปุ่มตัวกรอง
   const btnClass = "px-4 py-2 rounded-full text-sm transition ";
   const activeClass = btnClass + "bg-coral text-white shadow-md font-medium";
   const inactiveClass = btnClass + "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 font-medium";
@@ -1638,7 +1701,6 @@ function renderEmpSummary(c) {
     <div class="fade-in max-w-4xl mx-auto">
       <h2 class="font-display text-2xl font-bold mb-4">สรุปการทำงานของพนักงาน</h2>
       
-      <!-- ตัวกรองเวลา -->
       <div class="flex flex-col md:flex-row gap-3 mb-6 items-start md:items-center justify-between">
         <div class="flex flex-wrap gap-2">
           <button onclick="setEmpFilter('today')" class="${window.currentEmpFilter==='today'?activeClass:inactiveClass}">วันนี้</button>
@@ -1688,7 +1750,6 @@ window.setEmpFilter = (f, val = '') => {
   renderPage();
 };
 
-// ===== LOGIC สำหรับ Modal ประวัติพนักงาน =====
 window.openEmpLogModal = (empName) => {
   document.getElementById('empLogModalTitle').innerHTML = `<i data-lucide="history" class="w-5 h-5 inline-block mr-2 align-text-bottom text-coral"></i>ประวัติการทำงาน: <span class="text-coral">${empName}</span>`;
   const tbody = document.getElementById('empLogModalBody');
@@ -1696,7 +1757,6 @@ window.openEmpLogModal = (empName) => {
   const allLogs = getLogs();
   let filteredLogs = allLogs.filter(l => l.employee === empName);
 
-  // กรอง log ใน modal ตามช่วงเวลาที่กดเลือกไว้ข้างนอก
   if(window.currentEmpFilter === 'today') {
     filteredLogs = filteredLogs.filter(l => l.date && l.date.startsWith(todayStr()));
   } else if(window.currentEmpFilter === 'month') {
@@ -1706,7 +1766,6 @@ window.openEmpLogModal = (empName) => {
     filteredLogs = filteredLogs.filter(l => l.date && l.date.startsWith(window.customEmpDate));
   }
 
-  // เรียงจากใหม่ไปเก่า
   filteredLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
 
   tbody.innerHTML = filteredLogs.length ? filteredLogs.map(l => {
@@ -1714,10 +1773,7 @@ window.openEmpLogModal = (empName) => {
     const dateStr = dt.toLocaleDateString('th-TH', {day:'2-digit', month:'short', year:'2-digit'});
     const timeStr = dt.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
     
-    // ตรวจสอบว่ามี field edited_at หรือไม่ (เกิดจากการกดแก้ไข)
-    const editedBadge = l.edited_at ? `<div class="text-[10px] text-orange-500 mt-1 font-medium"><i data-lucide="edit-2" class="w-3 h-3 inline-block"></i> แก้ไขแล้ว</div>` : '';
-    
-    // แสดงตัวเลขเดิมที่ถูกขีดฆ่า หากเคยมีการแก้ไข
+    const editedBadge = l.edited_at ? `<div class="text-[10px] text-orange-500 mt-1 font-medium"><i data-lucide="pencil" class="w-3 h-3 inline-block"></i> แก้ไขแล้ว</div>` : '';
     const oldAmountHtml = (l.old_amount !== undefined && l.old_amount !== l.amount) ? `<div class="text-xs text-gray-400 line-through mb-0.5" title="จำนวนก่อนแก้ไข">${l.old_amount}</div>` : '';
 
     return `
@@ -1804,7 +1860,6 @@ function renderManageUsers(c) {
     if(!name||!pass) { errEl.textContent='กรุณากรอกข้อมูลให้ครบ'; errEl.classList.remove('hidden'); return; }
     if(getUsers().find(u=>u.employee===name)) { errEl.textContent='ชื่อผู้ใช้นี้มีแล้ว'; errEl.classList.remove('hidden'); return; }
     errEl.classList.add('hidden');
-    if(allRecords.length>=999){showToast('ข้อมูลเต็มแล้ว','error');return;}
     const btn = document.getElementById('nu_btn'); btn.disabled=true; btn.textContent='กำลังบันทึก...';
     const res = await window.dataSdk.create({type:'user',category:'',style:'',color:'',size:'',quantity:0,action:'',amount:0,employee:name,role,password:pass,date:new Date().toISOString(),note:''});
     btn.disabled=false; btn.textContent='เพิ่ม';
@@ -1836,7 +1891,6 @@ document.getElementById('loginBtn').onclick = async ()=>{
   const pass = document.getElementById('loginPass').value.trim();
   const errEl = document.getElementById('loginError');
 
-  // ตรวจสอบแอดมินเริ่มต้น
   const adminRec = getUsers().find(u=>u.employee==='admin');
   if(!adminRec && username==='admin' && pass==='1234') {
     currentUser = {employee:'admin',role:'admin'};
@@ -1845,7 +1899,6 @@ document.getElementById('loginBtn').onclick = async ()=>{
     return;
   }
 
-  // ตรวจสอบผู้ใช้จากฐานข้อมูล
   const user = getUsers().find(u=>u.employee===username&&u.password===pass);
   if(user) {
     currentUser = {employee:user.employee, role:user.role};
@@ -1922,6 +1975,7 @@ document.getElementById('changePassForm').onsubmit = async (e) => {
   if(res.isOk) {
     showToast('เปลี่ยนรหัสผ่านสำเร็จ');
     closeChangePassModal();
+    if(currentPage === 'manage_users') renderPage();
   } else {
     errEl.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
     errEl.classList.remove('hidden');
@@ -1989,13 +2043,11 @@ document.getElementById('editUserForm').onsubmit = async (e) => {
   btn.textContent = 'บันทึก';
 
   if (res.isOk) {
-    // หากแก้ไขข้อมูลของตัวเอง (ที่ล็อกอินอยู่) ให้อัปเดต UI ด้านบนด้วย
     if(existingUser.employee === currentUser.employee) {
       currentUser.employee = newName;
       currentUser.role = newRole;
       document.getElementById('userBadge').textContent = `${currentUser.employee} (${currentUser.role==='admin'?'ผู้ดูแล':currentUser.role==='owner'?'เจ้าของ':'พนักงาน'})`;
     }
-    
     showToast('แก้ไขข้อมูลผู้ใช้สำเร็จ');
     closeEditUserModal();
   } else {
