@@ -401,19 +401,21 @@ function openSidebar() {
 }
 document.getElementById('menuToggle').onclick = openSidebar;
 
-let currentPage = 'dashboard';
+let currentPage = 'stock';
 function buildSidebar() {
   const nav = document.getElementById('sideNav');
   const role = currentUser?.role || 'employee';
   const items = [];
-  items.push({id:'dashboard', icon:'layout-dashboard', label:'แดชบอร์ด'});
   items.push({id:'stock', icon:'package', label:'สต็อกสินค้า'});
+  items.push({id:'adjust_stock', icon:'arrow-up-down', label:'ปรับจำนวนสินค้า'});
+  
   if (role==='owner'||role==='admin') {
     items.push({id:'manage_config', icon:'settings', label:'จัดการการตั้งค่า'});
     items.push({id:'add_type', icon:'plus-circle', label:'เพิ่มชนิดสินค้า'});
   }
-  items.push({id:'adjust_stock', icon:'arrow-up-down', label:'ปรับจำนวนสินค้า'});
+  
   items.push({id:'daily_log', icon:'calendar', label:'สรุปรายวัน'});
+  
   if (role==='owner'||role==='admin') {
     items.push({id:'reports', icon:'bar-chart-3', label:'รายงานสรุป'});
     items.push({id:'emp_summary', icon:'users', label:'สรุปพนักงาน'});
@@ -453,7 +455,6 @@ function renderPage() {
   c.scrollTop = 0;
   loadConfiguration();
   switch(currentPage) {
-    case 'dashboard': renderDashboard(c); break;
     case 'stock': renderStock(c); break;
     case 'manage_config': renderManageConfig(c); break;
     case 'add_type': renderAddType(c); break;
@@ -462,7 +463,7 @@ function renderPage() {
     case 'reports': renderReports(c); break;
     case 'emp_summary': renderEmpSummary(c); break;
     case 'manage_users': renderManageUsers(c); break;
-    default: renderDashboard(c);
+    default: renderStock(c);
   }
   lucide.createIcons();
 }
@@ -561,7 +562,7 @@ document.getElementById('logoutBtn').onclick = () => {
   }
 
   document.getElementById('loginError').classList.add('hidden');
-  currentPage='dashboard';
+  currentPage='stock';
 };
 
 // เปลี่ยนรหัสผ่านของตัวเอง
@@ -686,7 +687,7 @@ document.getElementById('editUserForm').onsubmit = async (e) => {
   const res = await window.dataSdk.update(updatedData);
 
   btn.disabled = false;
-  btn.textContent = 'บันทึก';
+  btn.textContent = 'บันึก';
 
   if (res.isOk) {
     if(existingUser.employee === currentUser.employee) {
@@ -702,66 +703,74 @@ document.getElementById('editUserForm').onsubmit = async (e) => {
   }
 };
 
-// ===== DASHBOARD =====
-function renderDashboard(c) {
-  const summary = {};
-  CATEGORIES.forEach(cat => summary[cat] = 0);
-  getStocks().forEach(s => {
-    const tpl = getTemplates().find(t => t.__backendId === s.template_id);
-    if (tpl && summary[tpl.category] !== undefined) {
-      summary[tpl.category] += (parseInt(s.quantity) || 0);
-    }
-  });
-  const total = Object.values(summary).reduce((a,b)=>a+b,0);
-  const todayLogs = getLogs().filter(l=>l.date&&l.date.startsWith(todayStr()));
-  const todayIn = todayLogs.filter(l=>l.action==='add').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
-  const todayOut = todayLogs.filter(l=>l.action==='reduce').reduce((a,l)=>a+(parseInt(l.amount)||0),0);
-
-  c.innerHTML = `
-    <div class="fade-in max-w-5xl mx-auto">
-      <h2 class="font-display text-2xl font-bold mb-6">แดชบอร์ด</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="card-hover bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div class="text-xs text-gray-400 mb-1">สินค้าทั้งหมด</div>
-          <div class="text-3xl font-bold text-ink">${total}</div>
-        </div>
-        ${CATEGORIES.map(cat=>`
-        <div class="card-hover bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div class="text-xs text-gray-400 mb-1">${cat}</div>
-          <div class="text-3xl font-bold text-royal">${summary[cat] || 0}</div>
-        </div>`).join('')}
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div class="text-sm font-semibold mb-3 flex items-center gap-2"><i data-lucide="trending-up" class="w-4 h-4 text-green-500"></i>เพิ่มวันนี้</div>
-          <div class="text-3xl font-bold text-green-600">+${todayIn}</div>
-        </div>
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div class="text-sm font-semibold mb-3 flex items-center gap-2"><i data-lucide="trending-down" class="w-4 h-4 text-coral"></i>ใช้วันนี้</div>
-          <div class="text-3xl font-bold text-coral">-${todayOut}</div>
-        </div>
-      </div>
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h3 class="font-semibold mb-3">กิจกรรมล่าสุด</h3>
-        <div class="space-y-2 max-h-64 overflow-y-auto pr-2 sidebar-scroll">
-          ${todayLogs.slice(-10).reverse().map(l=>`
-            <div class="flex items-center justify-between py-2 border-b border-gray-50 text-sm">
-              <div><span class="inline-block w-2 h-2 rounded-full ${l.action==='add'?'bg-green-500':'bg-coral'} mr-2"></span>${l.category} ${l.style} ${l.color} ${l.size}</div>
-              <div class="flex items-center gap-3">
-                <span class="${l.action==='add'?'text-green-600':'text-coral'} font-semibold">${l.action==='add'?'+':'-'}${l.amount}</span>
-                <span class="text-gray-400 text-xs">${l.employee}</span>
-              </div>
-            </div>
-          `).join('')||'<p class="text-gray-400 text-sm">ยังไม่มีกิจกรรมวันนี้</p>'}
-        </div>
-      </div>
-    </div>`;
-}
-
 // ===== STOCK LIST =====
 function renderStock(c) {
   const templates = getTemplates();
   window.currentStockCategory = 'ทั้งหมด';
+  const sizeCols = SIZES.length > 0 ? SIZES : ['ไม่มีข้อมูลไซส์'];
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  let tableHTML = `
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
+            <tr>
+              <th class="px-4 py-3 text-left min-w-[200px]">สินค้า (แบบ / สี)</th>
+              ${sizeCols.map(size => `<th class="px-4 py-3 text-center w-20">${size}</th>`).join('')}
+              <th class="px-4 py-3 text-right w-24">รวมทั้งหมด</th>
+              ${isAdmin ? `<th class="px-4 py-3 text-center w-16">จัดการ</th>` : ''}
+            </tr>
+          </thead>
+          <tbody>
+  `;
+
+  if (templates.length === 0) {
+    tableHTML += `<tr><td colspan="${sizeCols.length + 2 + (isAdmin ? 1 : 0)}" class="px-4 py-8 text-center text-gray-400">ยังไม่มีสินค้าในสต็อก</td></tr>`;
+  } else {
+    templates.forEach(tpl => {
+      const tplStocks = getTemplateStocks(tpl.__backendId);
+      const stockMap = {};
+      let rowTotal = 0;
+      tplStocks.forEach(s => {
+        const qty = parseInt(s.quantity) || 0;
+        stockMap[s.size] = qty;
+        rowTotal += qty;
+      });
+
+      const searchStr = `${tpl.category} ${tpl.style} ${tpl.color}`.toLowerCase();
+
+      tableHTML += `
+        <tr class="stock-row border-b border-gray-50 hover:bg-gray-50 transition" data-cat="${tpl.category}" data-search="${searchStr}">
+          <td class="px-4 py-3">
+            <span class="font-semibold text-ink text-base">${tpl.style}</span>
+            <span class="text-gray-300 font-normal mx-2">|</span>
+            <span class="font-semibold text-gray-600 text-base">สี${tpl.color}</span>
+          </td>
+          ${sizeCols.map(size => {
+            const qty = stockMap[size] || 0;
+            const qtyClass = qty === 0 ? 'text-gray-300' : (qty <= 5 ? 'text-coral font-bold' : 'text-ink font-semibold');
+            return `<td class="px-4 py-3 text-center ${qtyClass}">${qty}</td>`;
+          }).join('')}
+          <td class="px-4 py-3 text-right font-bold text-royal bg-gray-50/50">${rowTotal}</td>
+          ${isAdmin ? `
+          <td class="px-4 py-3 text-center">
+            <button onclick="deleteProductTemplate('${tpl.__backendId}')" class="text-gray-400 hover:text-coral transition p-2 bg-gray-50 rounded-lg border border-transparent hover:border-coral/20" title="ลบสินค้านี้ออกจากร้าน">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </td>
+          ` : ''}
+        </tr>
+      `;
+    });
+  }
+
+  tableHTML += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
   
   c.innerHTML = `
     <div class="fade-in max-w-6xl mx-auto">
@@ -771,7 +780,7 @@ function renderStock(c) {
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <i data-lucide="search" class="w-5 h-5 text-gray-400"></i>
           </div>
-          <input type="text" id="stockSearchInput" class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50 transition text-sm shadow-sm" placeholder="ค้นหาหมวดหมู่, แบบ, สี, ไซส์..." onkeyup="filterStockRows()">
+          <input type="text" id="stockSearchInput" class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-coral/50 transition text-sm shadow-sm" placeholder="ค้นหาหมวดหมู่, แบบ, สี..." onkeyup="filterStockRows()">
         </div>
       </div>
       
@@ -780,36 +789,7 @@ function renderStock(c) {
         ${CATEGORIES.map(cat=>`<button onclick="setStockCat('${cat}', this)" class="stock-cat-btn px-4 py-2 rounded-full text-sm border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition font-medium">${cat}</button>`).join('')}
       </div>
       
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-gray-500"><tr>
-              <th class="px-4 py-3 text-left">หมวดหมู่</th>
-              <th class="px-4 py-3 text-left">แบบ</th>
-              <th class="px-4 py-3 text-left">สี</th>
-              <th class="px-4 py-3 text-left">ไซส์</th>
-              <th class="px-4 py-3 text-right">จำนวน</th>
-            </tr></thead>
-            <tbody>
-              ${templates.length ? templates.flatMap(tpl => {
-                const tplStocks = getTemplateStocks(tpl.__backendId);
-                return tplStocks.map(s => {
-                  const searchStr = `${tpl.category} ${tpl.style} ${tpl.color} ${s.size}`.toLowerCase();
-                  return `
-                  <tr class="stock-row border-b border-gray-50 hover:bg-gray-50 transition" data-cat="${tpl.category}" data-search="${searchStr}">
-                    <td class="px-4 py-3">${tpl.category}</td>
-                    <td class="px-4 py-3 font-medium text-ink">${tpl.style}</td>
-                    <td class="px-4 py-3">${tpl.color}</td>
-                    <td class="px-4 py-3 font-semibold">${s.size}</td>
-                    <td class="px-4 py-3 text-right font-semibold text-base ${(s.quantity||0)<=5?'text-coral':'text-ink'}">${s.quantity || 0}</td>
-                  </tr>
-                  `;
-                });
-              }).join('') : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">ยังไม่มีสินค้าในสต็อก</td></tr>'}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      ${tableHTML}
     </div>`;
 
   window.setStockCat = (cat, btn) => {
@@ -832,11 +812,48 @@ function renderStock(c) {
       else row.style.display = 'none';
     });
   };
+
+  window.deleteProductTemplate = async (id) => {
+    const btn = document.querySelector(`[onclick="deleteProductTemplate('${id}')"]`);
+    if(btn && !btn.dataset.confirming) {
+      btn.dataset.confirming = 'true';
+      btn.innerHTML = '<span class="text-xs text-coral font-semibold">ยืนยัน?</span>';
+      setTimeout(()=>{
+        if(btn){
+          btn.innerHTML = '<i data-lucide="trash-2" class="w-4 h-4"></i>';
+          delete btn.dataset.confirming;
+          lucide.createIcons();
+        }
+      }, 3000);
+      return;
+    }
+
+    const tpl = getTemplates().find(t => t.__backendId === id);
+    if(!tpl) return;
+
+    // ลบสต็อกไซส์ที่เกี่ยวข้องทั้งหมดก่อน
+    const relatedStocks = getTemplateStocks(id);
+    for (const s of relatedStocks) {
+      await window.dataSdk.delete(s);
+    }
+
+    // ลบตัวแม่แบบสินค้า
+    const res = await window.dataSdk.delete(tpl);
+
+    if(res.isOk) {
+      showToast('ลบสินค้าออกจากร้านสำเร็จ');
+      renderPage();
+    } else {
+      showToast('เกิดข้อผิดพลาดในการลบสินค้า', 'error');
+    }
+  };
+
   lucide.createIcons();
 }
 
 // ===== MANAGE CONFIGURATION (Owner/Admin) =====
 function renderManageConfig(c) {
+  const isAdmin = currentUser && currentUser.role === 'admin';
   c.innerHTML = `
     <div class="fade-in max-w-4xl mx-auto">
       <h2 class="font-display text-2xl font-bold mb-6">จัดการการตั้งค่าหมวดหมู่และแบบ</h2>
@@ -862,7 +879,7 @@ function renderManageConfig(c) {
           ${CATEGORIES.length ? CATEGORIES.map(cat => `
             <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <span>${cat}</span>
-              <button type="button" onclick="deleteCategoryItem('${cat}')" class="text-gray-400 hover:text-coral transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              ${isAdmin ? `<button type="button" onclick="deleteCategoryItem('${cat}')" class="text-gray-400 hover:text-coral transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
             </div>
           `).join('') : '<p class="text-gray-400 text-sm">ยังไม่มีหมวดหมู่ - เริ่มต้นด้วยการเพิ่มหมวดหมู่ข้างบน</p>'}
         </div>
@@ -896,7 +913,7 @@ function renderManageConfig(c) {
                       <div class="font-medium text-sm">${style.name}</div>
                     </div>
                     <div class="flex gap-2">
-                      <button type="button" onclick="deleteStyleItem('${cat}', '${style.name.replace(/'/g,"\\'")}');" class="text-gray-400 hover:text-coral transition"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                      ${isAdmin ? `<button type="button" onclick="deleteStyleItem('${cat}', '${style.name.replace(/'/g,"\\'")}');" class="text-gray-400 hover:text-coral transition"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
                     </div>
                   </div>
                 `).join('') : '<p class="text-gray-400 text-xs">ยังไม่มีแบบ - เพิ่มแบบได้ที่ด้านบน</p>'}
@@ -1015,6 +1032,7 @@ function renderAddType(c) {
   let selectedStyle = null;
   let selectedColors = [];
   let selectedSizes = {};
+  const isAdmin = currentUser && currentUser.role === 'admin';
 
   c.innerHTML = `
     <div class="fade-in max-w-5xl mx-auto">
@@ -1032,7 +1050,7 @@ function renderAddType(c) {
             ${COLORS.length ? COLORS.map(color => `
               <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full text-sm">
                 <span>${color}</span>
-                <button type="button" onclick="deleteColorItem('${color}')" class="text-gray-400 hover:text-coral transition ml-1"><i data-lucide="x" class="w-3 h-3"></i></button>
+                ${isAdmin ? `<button type="button" onclick="deleteColorItem('${color}')" class="text-gray-400 hover:text-coral transition ml-1"><i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
               </div>
             `).join('') : '<span class="text-gray-400 text-sm">ยังไม่มีสีในระบบ</span>'}
           </div>
@@ -1049,7 +1067,7 @@ function renderAddType(c) {
             ${SIZES.length ? SIZES.map(size => `
               <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full text-sm">
                 <span>${size}</span>
-                <button type="button" onclick="deleteSizeItem('${size}')" class="text-gray-400 hover:text-coral transition ml-1"><i data-lucide="x" class="w-3 h-3"></i></button>
+                ${isAdmin ? `<button type="button" onclick="deleteSizeItem('${size}')" class="text-gray-400 hover:text-coral transition ml-1"><i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
               </div>
             `).join('') : '<span class="text-gray-400 text-sm">ยังไม่มีไซส์ในระบบ</span>'}
           </div>
