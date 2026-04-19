@@ -160,6 +160,18 @@
     </div>
    </div>
 
+   <!-- Forgot Password Modal -->
+   <div id="forgotPassModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 mobile-overlay">
+    <div class="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm fade-in text-center">
+     <div class="w-14 h-14 rounded-full bg-navy text-coral flex items-center justify-center mx-auto mb-4 shadow-inner">
+       <i data-lucide="shield-alert" class="w-7 h-7"></i>
+     </div>
+     <h3 class="font-bold text-lg mb-2 text-ink">ลืมรหัสผ่านใช่หรือไม่?</h3>
+     <p class="text-sm text-gray-500 mb-6">เพื่อความปลอดภัยของข้อมูล<br>กรุณาติดต่อ <b class="text-ink">ผู้ดูแลระบบ (Admin)</b> หรือ <b class="text-ink">เจ้าของร้าน</b><br>เพื่อทำการตั้งค่ารหัสผ่านใหม่ให้กับคุณ</p>
+     <button type="button" onclick="closeForgotPassModal()" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition">รับทราบและปิดหน้าต่าง</button>
+    </div>
+   </div>
+
    <!-- Login Screen -->
    <div id="loginScreen" class="h-full flex items-center justify-center p-4" style="background: linear-gradient(135deg, #fff5f8 0%, #fce4ec 50%, #f8bbd0 100%);">
     <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm fade-in">
@@ -173,7 +185,10 @@
        <input id="loginUser" type="text" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition" placeholder="ใส่ชื่อผู้ใช้">
       </div>
       <div>
-       <label for="loginPass" class="block text-sm font-medium text-gray-600 mb-1">รหัสผ่าน</label> 
+       <div class="flex justify-between items-end mb-1">
+         <label for="loginPass" class="block text-sm font-medium text-gray-600">รหัสผ่าน</label> 
+         <button type="button" onclick="openForgotPassModal()" class="text-xs text-coral hover:text-royal transition font-medium">ลืมรหัสผ่าน?</button>
+       </div>
        <input id="loginPass" type="password" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition" placeholder="ใส่รหัสผ่าน">
       </div>
       <div id="loginError" class="text-coral text-sm hidden"></div>
@@ -226,14 +241,9 @@ let logs = [];
 if (typeof window.elementSdk === 'undefined') {
   window.elementSdk = {
     init: function(config) {
-      console.warn("Element SDK not found. Using fallback.");
-      if (config && config.onConfigChange) {
-        config.onConfigChange(config.defaultConfig || {});
-      }
+      if (config && config.onConfigChange) config.onConfigChange(config.defaultConfig || {});
     },
-    setConfig: function(config) {
-      console.log("Mock setConfig:", config);
-    }
+    setConfig: function(config) {}
   };
 }
 
@@ -249,39 +259,28 @@ if (typeof window.dataSdk === 'undefined') {
         const { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
         const { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
-        let firebaseConfig = null;
-
-        if (typeof __firebase_config !== 'undefined') {
-            firebaseConfig = JSON.parse(__firebase_config);
-        } else {
-            // === 🚨 นำ Firebase Config ของคุณมาวางตรงนี้ 🚨 ===
-            firebaseConfig = {
-                apiKey: "AIzaSyDJFa5SDbNeI4evmt8tiW_VhwrgCwz13pA",
-                authDomain: "anona-stock.firebaseapp.com",
-                projectId: "anona-stock",
-                storageBucket: "anona-stock.firebasestorage.app",
-                messagingSenderId: "242342005638",
-                appId: "1:242342005638:web:8d7b56aa9f9d4e85757a07",
-                measurementId: "G-0NQHHNK49F"
-            };
-            // =================================================================
-        }
-
-        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-            console.warn("ยังไม่ได้ตั้งค่า Firebase Config! กำลังทำงานในโหมดออฟไลน์ (ข้อมูลจะไม่ซิงค์)");
-            if (handler && handler.onDataChanged) handler.onDataChanged(allRecords);
-            return { isOk: true };
-        }
+        // === Firebase Config ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJFa5SDbNeI4evmt8tiW_VhwrgCwz13pA",
+            authDomain: "anona-stock.firebaseapp.com",
+            projectId: "anona-stock",
+            storageBucket: "anona-stock.firebasestorage.app",
+            messagingSenderId: "242342005638",
+            appId: "1:242342005638:web:8d7b56aa9f9d4e85757a07",
+            measurementId: "G-0NQHHNK49F"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         window._db = getFirestore(app);
-        window._appId = typeof __app_id !== 'undefined' ? __app_id : 'anona-story-database';
+        window._appId = 'anona-story-database';
 
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
+        // เนื่องจากเราใช้ Firebase Config ของตัวเอง
+        // จึงข้ามการใช้ Custom Token ของระบบ และบังคับใช้ Anonymous เสมอ
+        try {
             await signInAnonymously(auth);
+        } catch (err) {
+            console.error("Anonymous Auth Error:", err);
         }
 
         return new Promise((resolve) => {
@@ -312,12 +311,7 @@ if (typeof window.dataSdk === 'undefined') {
       }
     },
     create: async function(data) {
-        if (!window._db || !window._currentUserUid) {
-            const newRecord = { ...data, __backendId: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
-            allRecords.push(newRecord);
-            if (window._mockDataHandler && window._mockDataHandler.onDataChanged) window._mockDataHandler.onDataChanged([...allRecords]);
-            return { isOk: true, data: newRecord, record: newRecord };
-        }
+        if (!window._db || !window._currentUserUid) return { isOk: false, error: 'Not authenticated' };
         try {
             const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
             const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
@@ -327,15 +321,7 @@ if (typeof window.dataSdk === 'undefined') {
         } catch(e) { return { isOk: false, error: e }; }
     },
     update: async function(data) {
-        if (!window._db || !window._currentUserUid) {
-            const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
-            if (idx > -1) {
-                allRecords[idx] = { ...data };
-                if (window._mockDataHandler && window._mockDataHandler.onDataChanged) window._mockDataHandler.onDataChanged([...allRecords]);
-                return { isOk: true };
-            }
-            return { isOk: false, error: 'Record not found' };
-        }
+        if (!window._db || !window._currentUserUid) return { isOk: false, error: 'Not authenticated' };
         try {
             const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
             const docRef = doc(window._db, 'artifacts', window._appId, 'public', 'data', 'records', data.__backendId);
@@ -346,15 +332,7 @@ if (typeof window.dataSdk === 'undefined') {
         } catch(e) { return { isOk: false, error: e }; }
     },
     delete: async function(data) {
-        if (!window._db || !window._currentUserUid) {
-            const idx = allRecords.findIndex(r => r.__backendId === data.__backendId);
-            if (idx > -1) {
-                allRecords.splice(idx, 1);
-                if (window._mockDataHandler && window._mockDataHandler.onDataChanged) window._mockDataHandler.onDataChanged([...allRecords]);
-                return { isOk: true };
-            }
-            return { isOk: false, error: 'Record not found' };
-        }
+        if (!window._db || !window._currentUserUid) return { isOk: false, error: 'Not authenticated' };
         try {
             const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
             const docRef = doc(window._db, 'artifacts', window._appId, 'public', 'data', 'records', data.__backendId);
@@ -460,9 +438,6 @@ function getUsers() { return allRecords.filter(r=>r.type==='user'); }
 function getLogs() { return allRecords.filter(r=>r.type==='log'); }
 function todayStr() { return new Date().toISOString().slice(0,10); }
 
-function getTemplateKey(category, style, color) { return `${category}|${style}|${color}`; }
-function getStockKey(templateId, size) { return `${templateId}|${size}`; }
-
 function getTemplateStocks(templateId) {
   return getStocks().filter(s => s.template_id === templateId);
 }
@@ -486,6 +461,202 @@ function renderPage() {
   }
   lucide.createIcons();
 }
+
+// ===== AUTHENTICATION LOGIC =====
+window.openForgotPassModal = () => {
+  document.getElementById('forgotPassModal').classList.remove('hidden');
+  lucide.createIcons();
+};
+
+window.closeForgotPassModal = () => {
+  document.getElementById('forgotPassModal').classList.add('hidden');
+};
+
+document.getElementById('loginBtn').onclick = async ()=>{
+  const username = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value.trim();
+  const errEl = document.getElementById('loginError');
+
+  // ตรวจสอบหรือสร้าง Admin คนแรก
+  const adminRec = getUsers().find(u=>u.employee==='admin');
+  if(!adminRec && username==='admin' && pass==='1234') {
+    currentUser = {employee:'admin',role:'admin'};
+    await window.dataSdk.create({type:'user',category:'',style:'',color:'',size:'',quantity:0,action:'',amount:0,employee:'admin',role:'admin',password:'1234',date:new Date().toISOString(),note:''});
+    showMainApp();
+    return;
+  }
+
+  // ล็อกอินพนักงาน
+  const user = getUsers().find(u=>u.employee===username&&u.password===pass);
+  if(user) {
+    currentUser = {employee:user.employee, role:user.role};
+    showMainApp();
+  } else {
+    errEl.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+    errEl.classList.remove('hidden');
+  }
+};
+
+document.getElementById('loginPass').onkeydown = (e)=>{if(e.key==='Enter')document.getElementById('loginBtn').click();};
+document.getElementById('loginUser').onkeydown = (e)=>{if(e.key==='Enter')document.getElementById('loginPass').focus();};
+
+function showMainApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    
+    const roleName = currentUser.role==='admin'?'ผู้ดูแล':currentUser.role==='owner'?'เจ้าของ':'พนักงาน';
+    document.getElementById('userBadge').textContent = `${currentUser.employee} (${roleName})`;
+    
+    buildSidebar();
+    renderPage();
+}
+
+document.getElementById('logoutBtn').onclick = () => {
+  currentUser = null;
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginError').classList.add('hidden');
+  currentPage='dashboard';
+};
+
+// เปลี่ยนรหัสผ่านของตัวเอง
+document.getElementById('changePassBtn').onclick = () => {
+  document.getElementById('changePassModal').classList.remove('hidden');
+};
+
+window.closeChangePassModal = () => {
+  document.getElementById('changePassModal').classList.add('hidden');
+  document.getElementById('changePassForm').reset();
+  document.getElementById('cp_error').classList.add('hidden');
+};
+
+document.getElementById('changePassForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const current = document.getElementById('cp_current').value.trim();
+  const newPass = document.getElementById('cp_new').value.trim();
+  const confirmPass = document.getElementById('cp_confirm').value.trim();
+  const errEl = document.getElementById('cp_error');
+
+  if(!current || !newPass || !confirmPass) {
+    errEl.textContent = 'กรุณากรอกข้อมูลให้ครบ';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  if(newPass !== confirmPass) {
+    errEl.textContent = 'รหัสผ่านใหม่ไม่ตรงกัน';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const userRec = getUsers().find(u => u.employee === currentUser.employee);
+  if(!userRec) {
+    errEl.textContent = 'ไม่พบข้อมูลผู้ใช้';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  if(userRec.password !== current) {
+    errEl.textContent = 'รหัสผ่านปัจจุบันไม่ถูกต้อง';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  errEl.classList.add('hidden');
+  const btn = document.getElementById('cp_btn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+
+  const res = await window.dataSdk.update({...userRec, password: newPass});
+  
+  btn.disabled = false;
+  btn.textContent = 'บันทึก';
+
+  if(res.isOk) {
+    showToast('เปลี่ยนรหัสผ่านสำเร็จ');
+    closeChangePassModal();
+    if(currentPage === 'manage_users') renderPage();
+  } else {
+    errEl.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
+    errEl.classList.remove('hidden');
+  }
+};
+
+window.openEditUserModal = (id) => {
+  const user = getUsers().find(u => u.__backendId === id);
+  if (!user) return;
+  document.getElementById('eu_id').value = user.__backendId;
+  document.getElementById('eu_name').value = user.employee;
+  document.getElementById('eu_pass').value = ''; 
+  document.getElementById('eu_role').value = user.role;
+  document.getElementById('eu_error').classList.add('hidden');
+  document.getElementById('editUserModal').classList.remove('hidden');
+};
+
+window.closeEditUserModal = () => {
+  document.getElementById('editUserModal').classList.add('hidden');
+  document.getElementById('editUserForm').reset();
+};
+
+document.getElementById('editUserForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('eu_id').value;
+  const newName = document.getElementById('eu_name').value.trim();
+  const newPass = document.getElementById('eu_pass').value.trim();
+  const newRole = document.getElementById('eu_role').value;
+  const errEl = document.getElementById('eu_error');
+
+  if (!newName) {
+    errEl.textContent = 'กรุณากรอกชื่อผู้ใช้';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const existingUser = getUsers().find(u => u.__backendId === id);
+  if (!existingUser) return;
+
+  const nameConflict = getUsers().find(u => u.employee === newName && u.__backendId !== id);
+  if (nameConflict) {
+    errEl.textContent = 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  errEl.classList.add('hidden');
+  const btn = document.getElementById('eu_btn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+
+  const updatedData = {
+    ...existingUser,
+    employee: newName,
+    role: newRole
+  };
+  
+  if (newPass) {
+    updatedData.password = newPass;
+  }
+
+  const res = await window.dataSdk.update(updatedData);
+
+  btn.disabled = false;
+  btn.textContent = 'บันทึก';
+
+  if (res.isOk) {
+    if(existingUser.employee === currentUser.employee) {
+      currentUser.employee = newName;
+      currentUser.role = newRole;
+      document.getElementById('userBadge').textContent = `${currentUser.employee} (${currentUser.role==='admin'?'ผู้ดูแล':currentUser.role==='owner'?'เจ้าของ':'พนักงาน'})`;
+    }
+    showToast('แก้ไขข้อมูลผู้ใช้สำเร็จ');
+    closeEditUserModal();
+  } else {
+    errEl.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
+    errEl.classList.remove('hidden');
+  }
+};
 
 // ===== DASHBOARD =====
 function renderDashboard(c) {
@@ -613,12 +784,8 @@ function renderStock(c) {
     rows.forEach(row => {
       const catMatch = window.currentStockCategory === 'ทั้งหมด' || row.dataset.cat === window.currentStockCategory;
       const searchMatch = searchText === '' || row.dataset.search.includes(searchText);
-      
-      if (catMatch && searchMatch) {
-        row.style.display = '';
-      } else {
-        row.style.display = 'none';
-      }
+      if (catMatch && searchMatch) row.style.display = '';
+      else row.style.display = 'none';
     });
   };
   lucide.createIcons();
@@ -636,7 +803,6 @@ function renderManageConfig(c) {
       </div>
       ` : ''}
 
-      <!-- Add Category -->
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
         <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>เพิ่มหมวดหมู่สินค้า</h3>
         <form id="addCatForm" class="flex gap-3">
@@ -646,7 +812,6 @@ function renderManageConfig(c) {
         <div id="ac_error" class="text-coral text-sm mt-2 hidden"></div>
       </div>
 
-      <!-- Manage Categories -->
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
         <h3 class="font-semibold mb-3">หมวดหมู่ที่มี</h3>
         <div class="space-y-2">
@@ -659,7 +824,6 @@ function renderManageConfig(c) {
         </div>
       </div>
 
-      <!-- Add Style -->
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
         <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>เพิ่มแบบสินค้า</h3>
         <form id="addStyleForm" class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -675,7 +839,6 @@ function renderManageConfig(c) {
         <div id="as_error" class="text-coral text-sm mt-2 hidden"></div>
       </div>
 
-      <!-- Manage Styles by Category -->
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
         <h3 class="font-semibold mb-3">แบบตามหมวดหมู่</h3>
         <div class="space-y-4">
@@ -814,7 +977,6 @@ function renderAddType(c) {
       <h2 class="font-display text-2xl font-bold mb-6">เพิ่มชนิดสินค้า</h2>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <!-- Manage Colors -->
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="palette" class="w-4 h-4"></i>จัดการสี</h3>
           <form id="addTypeColorForm" class="flex gap-2 mb-4">
@@ -832,7 +994,6 @@ function renderAddType(c) {
           </div>
         </div>
 
-        <!-- Manage Sizes -->
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="ruler" class="w-4 h-4"></i>จัดการไซส์</h3>
           <form id="addTypeSizeForm" class="flex gap-2 mb-4">
@@ -851,7 +1012,6 @@ function renderAddType(c) {
         </div>
       </div>
 
-      <!-- Create Product Type Form -->
       <form id="typeForm" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
         <h3 class="font-semibold text-lg border-b border-gray-100 pb-3">สร้างชนิดสินค้าเข้าระบบ</h3>
         
@@ -915,17 +1075,10 @@ function renderAddType(c) {
   function renderColorGrid() {
     const colorContainer = document.getElementById('colorContainer');
     const grid = document.getElementById('colorGrid');
-    
-    if (!selectedStyle) {
+    if (!selectedStyle || COLORS.length === 0) {
       colorContainer.classList.add('hidden');
       return;
     }
-
-    if (COLORS.length === 0) {
-      colorContainer.classList.add('hidden');
-      return;
-    }
-
     colorContainer.classList.remove('hidden');
     grid.innerHTML = COLORS.map(color => `
       <button type="button" class="color-btn px-4 py-2 rounded-lg border-2 transition ${selectedColors.includes(color) ? 'border-coral bg-coral/10 font-medium' : 'border-gray-200 bg-gray-50 hover:border-coral'}" onclick="toggleColorNew('${color}', event)">
@@ -951,12 +1104,10 @@ function renderAddType(c) {
   function renderSizeSelection() {
     const container = document.getElementById('selectedColorsContainer');
     const sizeContainer = document.getElementById('sizeSelectionContainer');
-
     if (selectedColors.length === 0) {
       container.classList.add('hidden');
       return;
     }
-
     container.classList.remove('hidden');
     sizeContainer.innerHTML = selectedColors.map(color => `
       <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
@@ -998,11 +1149,8 @@ function renderAddType(c) {
   window.updateStyleColorsNew = () => {
     const cat = document.getElementById('tf_cat').value;
     const styleIdx = parseInt(document.getElementById('tf_style').value);
-    if (isNaN(styleIdx) || !STYLES[cat] || !STYLES[cat][styleIdx]) {
-      selectedStyle = null;
-    } else {
-      selectedStyle = STYLES[cat][styleIdx];
-    }
+    if (isNaN(styleIdx) || !STYLES[cat] || !STYLES[cat][styleIdx]) selectedStyle = null;
+    else selectedStyle = STYLES[cat][styleIdx];
     selectedColors = [];
     selectedSizes = {};
     renderColorGrid();
@@ -1016,68 +1164,39 @@ function renderAddType(c) {
     const errEl = document.getElementById('tf_error');
 
     if (!cat || isNaN(styleIdx) || !STYLES[cat] || !STYLES[cat][styleIdx]) {
-      errEl.textContent = 'กรุณาเลือกหมวดหมู่และแบบ';
-      errEl.classList.remove('hidden');
-      return;
+      errEl.textContent = 'กรุณาเลือกหมวดหมู่และแบบ'; errEl.classList.remove('hidden'); return;
     }
-
     if (selectedColors.length === 0) {
-      errEl.textContent = 'กรุณาเลือกอย่างน้อย 1 สี';
-      errEl.classList.remove('hidden');
-      return;
+      errEl.textContent = 'กรุณาเลือกอย่างน้อย 1 สี'; errEl.classList.remove('hidden'); return;
     }
-
     for (const color of selectedColors) {
       if (!selectedSizes[color] || selectedSizes[color].length === 0) {
-        errEl.textContent = `กรุณาเลือกไซส์สำหรับสี "${color}"`;
-        errEl.classList.remove('hidden');
-        return;
+        errEl.textContent = `กรุณาเลือกไซส์สำหรับสี "${color}"`; errEl.classList.remove('hidden'); return;
       }
     }
     errEl.classList.add('hidden');
 
     const btn = document.getElementById('tf_btn');
-    btn.disabled = true;
-    btn.textContent = 'กำลังบันทึก...';
-
+    btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
     const style = STYLES[cat][styleIdx];
 
     try {
       for (const color of selectedColors) {
         const key = `${cat}|${style.name}|${color}`;
-        
         if (getTemplates().find(t => `${t.category}|${t.style}|${t.color}` === key)) {
           errEl.textContent = `ชนิดสินค้า "${style.name} ${color}" มีแล้ว`;
-          errEl.classList.remove('hidden');
-          btn.disabled = false;
-          btn.textContent = 'สร้างชนิดสินค้า';
-          return;
+          errEl.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'สร้างชนิดสินค้า'; return;
         }
 
         const templateRes = await window.dataSdk.create({
-          type: 'template',
-          category: cat,
-          style: style.name,
-          color,
-          size: '',
-          quantity: 0,
-          action: '',
-          amount: 0,
-          employee: '',
-          role: '',
-          password: '',
-          date: '',
-          note: '',
-          template_id: '',
-          sizes_json: JSON.stringify(selectedSizes[color])
+          type: 'template', category: cat, style: style.name, color, size: '',
+          quantity: 0, action: '', amount: 0, employee: '', role: '', password: '', date: '', note: '',
+          template_id: '', sizes_json: JSON.stringify(selectedSizes[color])
         });
 
         if (!templateRes.isOk) {
-          errEl.textContent = 'เกิดข้อผิดพลาดในการสร้างสินค้า';
-          errEl.classList.remove('hidden');
-          btn.disabled = false;
-          btn.textContent = 'สร้างชนิดสินค้า';
-          return;
+          errEl.textContent = 'เกิดข้อผิดพลาดในการสร้างสินค้า'; errEl.classList.remove('hidden');
+          btn.disabled = false; btn.textContent = 'สร้างชนิดสินค้า'; return;
         }
 
         let newTemplateId = templateRes?.data?.__backendId || templateRes?.record?.__backendId;
@@ -1091,45 +1210,25 @@ function renderAddType(c) {
         if (newTemplateId) {
           for (const size of selectedSizes[color]) {
             await window.dataSdk.create({
-              type: 'stock',
-              category: cat,
-              style: style.name,
-              color,
-              size,
-              quantity: 0,
-              action: '',
-              amount: 0,
-              employee: '',
-              role: '',
-              password: '',
-              date: '',
-              note: '',
-              template_id: newTemplateId,
-              sizes_json: ''
+              type: 'stock', category: cat, style: style.name, color, size,
+              quantity: 0, action: '', amount: 0, employee: '', role: '', password: '', date: '', note: '',
+              template_id: newTemplateId, sizes_json: ''
             });
           }
         }
       }
-
       showToast('สร้างชนิดสินค้าสำเร็จ');
-      btn.disabled = false;
-      btn.textContent = 'สร้างชนิดสินค้า';
+      btn.disabled = false; btn.textContent = 'สร้างชนิดสินค้า';
       document.getElementById('typeForm').reset();
-      selectedStyle = null;
-      selectedColors = [];
-      selectedSizes = {};
-      renderColorGrid();
-      renderSizeSelection();
+      selectedStyle = null; selectedColors = []; selectedSizes = {};
+      renderColorGrid(); renderSizeSelection();
     } catch (err) {
       errEl.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || '');
-      errEl.classList.remove('hidden');
-      btn.disabled = false;
-      btn.textContent = 'สร้างชนิดสินค้า';
+      errEl.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'สร้างชนิดสินค้า';
     }
   };
 
-  renderColorGrid();
-  renderSizeSelection();
+  renderColorGrid(); renderSizeSelection();
   lucide.createIcons();
 }
 
@@ -1188,7 +1287,6 @@ function renderAdjustStock(c) {
         </form>
       </div>
 
-      <!-- ประวัติล่าสุด -->
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <h3 class="font-semibold mb-4 text-ink flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-gray-400"></i> ประวัติการทำรายการล่าสุดของคุณ (วันนี้)</h3>
         <div class="overflow-x-auto">
@@ -1238,16 +1336,11 @@ function renderAdjustStock(c) {
     } else {
       selectEl.innerHTML = filtered.map(t => `<option value="${t.__backendId}" class="p-2.5 border-b border-gray-100 last:border-0 rounded-lg hover:bg-coral/10 focus:bg-coral/10 cursor-pointer">📦 [${t.category}] ${t.style} - สี${t.color}</option>`).join('');
     }
-    
-    if (filtered.length === 1 && text.length > 0) {
-        selectEl.value = filtered[0].__backendId;
-    }
+    if (filtered.length === 1 && text.length > 0) selectEl.value = filtered[0].__backendId;
     window.showTemplateSizes();
   }
 
-  searchEl.addEventListener('input', (e) => {
-    renderOptions(e.target.value);
-  });
+  searchEl.addEventListener('input', (e) => { renderOptions(e.target.value); });
 
   const btnAdd = document.getElementById('modeAddBtn');
   const btnReduce = document.getElementById('modeReduceBtn');
@@ -1281,11 +1374,7 @@ function renderAdjustStock(c) {
     const container = document.getElementById('sizeInputsContainer');
     const inputsDiv = document.getElementById('sizeInputs');
     
-    if (!templateId) {
-      container.classList.add('hidden');
-      return;
-    }
-
+    if (!templateId) { container.classList.add('hidden'); return; }
     const template = getTemplates().find(t => t.__backendId === templateId);
     if (!template) return;
 
@@ -1295,11 +1384,7 @@ function renderAdjustStock(c) {
 
     let allowedSizes = SIZES;
     if (template.sizes_json) {
-      try {
-        allowedSizes = JSON.parse(template.sizes_json) || SIZES;
-      } catch(e) {
-        allowedSizes = SIZES;
-      }
+      try { allowedSizes = JSON.parse(template.sizes_json) || SIZES; } catch(e) {}
     }
 
     const inputColorClass = currentMode === 'add' ? 'focus:ring-green-500/50 focus:border-green-500' : 'focus:ring-coral/50 focus:border-coral';
@@ -1325,12 +1410,7 @@ function renderAdjustStock(c) {
     const note = document.getElementById('af_note').value;
     const errEl = document.getElementById('af_error');
 
-    if (!templateId) {
-      errEl.textContent = 'กรุณาเลือกชนิดสินค้า';
-      errEl.classList.remove('hidden');
-      return;
-    }
-
+    if (!templateId) { errEl.textContent = 'กรุณาเลือกชนิดสินค้า'; errEl.classList.remove('hidden'); return; }
     const template = getTemplates().find(t => t.__backendId === templateId);
     if (!template) return;
 
@@ -1340,16 +1420,11 @@ function renderAdjustStock(c) {
     
     document.querySelectorAll('.size-input').forEach(inp => {
       const val = parseInt(inp.value);
-      if (!isNaN(val) && val > 0) {
-        adjustments[inp.dataset.size] = val;
-        totalAdjusted += val;
-      }
+      if (!isNaN(val) && val > 0) { adjustments[inp.dataset.size] = val; totalAdjusted += val; }
     });
 
     if (totalAdjusted === 0) {
-      errEl.textContent = 'กรุณาระบุจำนวนสินค้าอย่างน้อย 1 รายการ';
-      errEl.classList.remove('hidden');
-      return;
+      errEl.textContent = 'กรุณาระบุจำนวนสินค้าอย่างน้อย 1 รายการ'; errEl.classList.remove('hidden'); return;
     }
 
     if (currentMode === 'reduce') {
@@ -1358,8 +1433,7 @@ function renderAdjustStock(c) {
             const currentQty = existingStock ? (parseInt(existingStock.quantity) || 0) : 0;
             if (amount > currentQty) {
                 errEl.textContent = `จำนวนที่ระบุ (ไซส์ ${size}) มากกว่าสต็อกที่มีอยู่ (มี ${currentQty})`;
-                errEl.classList.remove('hidden');
-                return;
+                errEl.classList.remove('hidden'); return;
             }
         }
     }
@@ -1367,8 +1441,7 @@ function renderAdjustStock(c) {
     errEl.classList.add('hidden');
     const btn = document.getElementById('af_btn');
     const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'กำลังบันทึก...';
+    btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
 
     try {
       for (const [size, amount] of Object.entries(adjustments)) {
@@ -1378,64 +1451,31 @@ function renderAdjustStock(c) {
         if (existingStock) {
           const oldQty = parseInt(existingStock.quantity) || 0;
           newQty = currentMode === 'add' ? oldQty + amount : oldQty - amount;
-
-          const updateRes = await window.dataSdk.update({
-            ...existingStock,
-            quantity: newQty
-          });
-
+          const updateRes = await window.dataSdk.update({...existingStock, quantity: newQty});
           if (!updateRes.isOk) throw new Error(`อัปเดตสต็อกไซส์ ${size} ไม่สำเร็จ`);
         } else if (currentMode === 'add') {
           newQty = amount;
           const createRes = await window.dataSdk.create({
-            type:'stock',
-            category:template.category,
-            style:template.style,
-            color:template.color,
-            size,
-            quantity:newQty,
-            action:'',
-            amount:0,
-            employee:'',
-            role:'',
-            password:'',
-            date:'',
-            note:'',
-            template_id:templateId,
-            sizes_json:''
+            type:'stock', category:template.category, style:template.style, color:template.color, size,
+            quantity:newQty, action:'', amount:0, employee:'', role:'', password:'', date:'', note:'',
+            template_id:templateId, sizes_json:''
           });
           if (!createRes.isOk) throw new Error(`สร้างสต็อกไซส์ ${size} ไม่สำเร็จ`);
         }
 
         await window.dataSdk.create({
-          type:'log',
-          category:template.category,
-          style:template.style,
-          color:template.color,
-          size,
-          quantity:0,
-          action: currentMode,
-          amount: amount,
-          employee:currentUser.employee,
-          role:currentUser.role,
-          password:'',
-          date:new Date().toISOString(),
-          note: note || (currentMode === 'add' ? 'เพิ่มจำนวนสินค้า' : 'เบิกออก/ใช้สินค้า'),
-          template_id:templateId,
-          sizes_json:''
+          type:'log', category:template.category, style:template.style, color:template.color, size,
+          quantity:0, action: currentMode, amount: amount, employee:currentUser.employee, role:currentUser.role,
+          password:'', date:new Date().toISOString(), note: note || (currentMode === 'add' ? 'เพิ่มจำนวนสินค้า' : 'เบิกออก/ใช้สินค้า'),
+          template_id:templateId, sizes_json:''
         });
       }
-
       showToast(currentMode === 'add' ? 'เพิ่มสต็อกสำเร็จ' : 'ลดสต็อกสำเร็จ');
-      btn.disabled=false;
-      btn.textContent=originalText;
-      
-      renderPage(); // Refresh view including history
+      btn.disabled=false; btn.textContent=originalText;
+      renderPage(); 
     } catch (err) {
       errEl.textContent = err.message || 'เกิดข้อผิดพลาดในการบันทึก';
-      errEl.classList.remove('hidden');
-      btn.disabled=false; 
-      btn.textContent=originalText;
+      errEl.classList.remove('hidden'); btn.disabled=false; btn.textContent=originalText;
     }
   };
 
@@ -1520,65 +1560,42 @@ document.getElementById('editLogForm').onsubmit = async (e) => {
   const errEl = document.getElementById('el_error');
 
   if(isNaN(newAmount) || newAmount < 0) {
-    errEl.textContent = 'กรุณาระบุจำนวนให้ถูกต้อง (ต้องไม่ติดลบ)';
-    errEl.classList.remove('hidden');
-    return;
+    errEl.textContent = 'กรุณาระบุจำนวนให้ถูกต้อง (ต้องไม่ติดลบ)'; errEl.classList.remove('hidden'); return;
   }
 
   const logRec = getLogs().find(l => l.__backendId === id);
   if(!logRec) return;
 
   const oldAmount = parseInt(logRec.amount) || 0;
-
-  if(newAmount === oldAmount && newNote === logRec.note) {
-    closeEditLogModal();
-    return;
-  }
+  if(newAmount === oldAmount && newNote === logRec.note) { closeEditLogModal(); return; }
 
   let stockRec = getTemplateStocks(logRec.template_id).find(s => s.size === logRec.size);
-  if(!stockRec) {
-    stockRec = getStocks().find(s => s.category === logRec.category && s.style === logRec.style && s.color === logRec.color && s.size === logRec.size);
-  }
+  if(!stockRec) stockRec = getStocks().find(s => s.category === logRec.category && s.style === logRec.style && s.color === logRec.color && s.size === logRec.size);
 
   if(!stockRec) {
-    errEl.textContent = 'ไม่พบข้อมูลสต็อกต้นทาง ไม่สามารถแก้ไขได้';
-    errEl.classList.remove('hidden');
-    return;
+    errEl.textContent = 'ไม่พบข้อมูลสต็อกต้นทาง ไม่สามารถแก้ไขได้'; errEl.classList.remove('hidden'); return;
   }
 
   const diff = newAmount - oldAmount;
   let newStockQty = parseInt(stockRec.quantity) || 0;
-
-  if(logRec.action === 'add') {
-    newStockQty += diff; 
-  } else {
-    newStockQty -= diff; 
-  }
+  if(logRec.action === 'add') newStockQty += diff; 
+  else newStockQty -= diff; 
 
   if(newStockQty < 0) {
-    errEl.textContent = `ยอดสต็อกคงเหลือจะติดลบ (${newStockQty}) หากแก้ไขด้วยจำนวนนี้`;
-    errEl.classList.remove('hidden');
-    return;
+    errEl.textContent = `ยอดสต็อกคงเหลือจะติดลบ (${newStockQty}) หากแก้ไขด้วยจำนวนนี้`; errEl.classList.remove('hidden'); return;
   }
 
   errEl.classList.add('hidden');
   const btn = document.getElementById('el_btn');
-  btn.disabled = true;
-  btn.textContent = 'กำลังบันทึก...';
+  btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
 
   try {
     if(diff !== 0) {
       const sRes = await window.dataSdk.update({...stockRec, quantity: newStockQty});
       if(!sRes.isOk) throw new Error('อัปเดตสต็อกสินค้าหลักไม่สำเร็จ');
     }
-    
     const lRes = await window.dataSdk.update({
-      ...logRec, 
-      amount: newAmount, 
-      note: newNote,
-      edited_at: new Date().toISOString(),
-      old_amount: oldAmount,
-      old_note: logRec.note || ''
+      ...logRec, amount: newAmount, note: newNote, edited_at: new Date().toISOString(), old_amount: oldAmount, old_note: logRec.note || ''
     });
     if(!lRes.isOk) throw new Error('อัปเดตรายการรายวันไม่สำเร็จ');
 
@@ -1586,11 +1603,9 @@ document.getElementById('editLogForm').onsubmit = async (e) => {
     closeEditLogModal();
     renderPage();
   } catch(err) {
-    errEl.textContent = err.message;
-    errEl.classList.remove('hidden');
+    errEl.textContent = err.message; errEl.classList.remove('hidden');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'บันทึก';
+    btn.disabled = false; btn.textContent = 'บันทึก';
   }
 };
 
@@ -1744,9 +1759,7 @@ function renderEmpSummary(c) {
 
 window.setEmpFilter = (f, val = '') => {
   window.currentEmpFilter = f;
-  if(f === 'custom') {
-    window.customEmpDate = val;
-  }
+  if(f === 'custom') window.customEmpDate = val;
   renderPage();
 };
 
@@ -1878,193 +1891,14 @@ function renderManageUsers(c) {
       return;
     }
     const res = await window.dataSdk.delete(rec);
-    if(res.isOk) showToast('ลบผู้ใช้สำเร็จ');
-    else showToast('เกิดข้อผิดพลาด','error');
+    if(res.isOk) {
+        showToast('ลบผู้ใช้สำเร็จ');
+        renderPage();
+    } else showToast('เกิดข้อผิดพลาด','error');
   };
 
   lucide.createIcons();
 }
-
-// ===== LOGIN =====
-document.getElementById('loginBtn').onclick = async ()=>{
-  const username = document.getElementById('loginUser').value.trim();
-  const pass = document.getElementById('loginPass').value.trim();
-  const errEl = document.getElementById('loginError');
-
-  const adminRec = getUsers().find(u=>u.employee==='admin');
-  if(!adminRec && username==='admin' && pass==='1234') {
-    currentUser = {employee:'admin',role:'admin'};
-    await window.dataSdk.create({type:'user',category:'',style:'',color:'',size:'',quantity:0,action:'',amount:0,employee:'admin',role:'admin',password:'1234',date:new Date().toISOString(),note:''});
-    showMainApp();
-    return;
-  }
-
-  const user = getUsers().find(u=>u.employee===username&&u.password===pass);
-  if(user) {
-    currentUser = {employee:user.employee, role:user.role};
-    showMainApp();
-  } else {
-    errEl.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
-    errEl.classList.remove('hidden');
-  }
-};
-
-document.getElementById('loginPass').onkeydown = (e)=>{if(e.key==='Enter')document.getElementById('loginBtn').click();};
-document.getElementById('loginUser').onkeydown = (e)=>{if(e.key==='Enter')document.getElementById('loginPass').focus();};
-
-function showMainApp() {
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('mainApp').classList.remove('hidden');
-  document.getElementById('userBadge').textContent = `${currentUser.employee} (${currentUser.role==='admin'?'ผู้ดูแล':currentUser.role==='owner'?'เจ้าของ':'พนักงาน'})`;
-  buildSidebar();
-  renderPage();
-}
-
-document.getElementById('changePassBtn').onclick = () => {
-  document.getElementById('changePassModal').classList.remove('hidden');
-};
-
-window.closeChangePassModal = () => {
-  document.getElementById('changePassModal').classList.add('hidden');
-  document.getElementById('changePassForm').reset();
-  document.getElementById('cp_error').classList.add('hidden');
-};
-
-document.getElementById('changePassForm').onsubmit = async (e) => {
-  e.preventDefault();
-  const current = document.getElementById('cp_current').value.trim();
-  const newPass = document.getElementById('cp_new').value.trim();
-  const confirmPass = document.getElementById('cp_confirm').value.trim();
-  const errEl = document.getElementById('cp_error');
-
-  if(!current || !newPass || !confirmPass) {
-    errEl.textContent = 'กรุณากรอกข้อมูลให้ครบ';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  if(newPass !== confirmPass) {
-    errEl.textContent = 'รหัสผ่านใหม่ไม่ตรงกัน';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const userRec = getUsers().find(u => u.employee === currentUser.employee);
-  if(!userRec) {
-    errEl.textContent = 'ไม่พบข้อมูลผู้ใช้';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  if(userRec.password !== current) {
-    errEl.textContent = 'รหัสผ่านปัจจุบันไม่ถูกต้อง';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  errEl.classList.add('hidden');
-  const btn = document.getElementById('cp_btn');
-  btn.disabled = true;
-  btn.textContent = 'กำลังบันทึก...';
-
-  const res = await window.dataSdk.update({...userRec, password: newPass});
-  
-  btn.disabled = false;
-  btn.textContent = 'บันทึก';
-
-  if(res.isOk) {
-    showToast('เปลี่ยนรหัสผ่านสำเร็จ');
-    closeChangePassModal();
-    if(currentPage === 'manage_users') renderPage();
-  } else {
-    errEl.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
-    errEl.classList.remove('hidden');
-  }
-};
-
-window.openEditUserModal = (id) => {
-  const user = getUsers().find(u => u.__backendId === id);
-  if (!user) return;
-  document.getElementById('eu_id').value = user.__backendId;
-  document.getElementById('eu_name').value = user.employee;
-  document.getElementById('eu_pass').value = ''; 
-  document.getElementById('eu_role').value = user.role;
-  document.getElementById('eu_error').classList.add('hidden');
-  document.getElementById('editUserModal').classList.remove('hidden');
-};
-
-window.closeEditUserModal = () => {
-  document.getElementById('editUserModal').classList.add('hidden');
-  document.getElementById('editUserForm').reset();
-};
-
-document.getElementById('editUserForm').onsubmit = async (e) => {
-  e.preventDefault();
-  const id = document.getElementById('eu_id').value;
-  const newName = document.getElementById('eu_name').value.trim();
-  const newPass = document.getElementById('eu_pass').value.trim();
-  const newRole = document.getElementById('eu_role').value;
-  const errEl = document.getElementById('eu_error');
-
-  if (!newName) {
-    errEl.textContent = 'กรุณากรอกชื่อผู้ใช้';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const existingUser = getUsers().find(u => u.__backendId === id);
-  if (!existingUser) return;
-
-  const nameConflict = getUsers().find(u => u.employee === newName && u.__backendId !== id);
-  if (nameConflict) {
-    errEl.textContent = 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  errEl.classList.add('hidden');
-  const btn = document.getElementById('eu_btn');
-  btn.disabled = true;
-  btn.textContent = 'กำลังบันทึก...';
-
-  const updatedData = {
-    ...existingUser,
-    employee: newName,
-    role: newRole
-  };
-  
-  if (newPass) {
-    updatedData.password = newPass;
-  }
-
-  const res = await window.dataSdk.update(updatedData);
-
-  btn.disabled = false;
-  btn.textContent = 'บันทึก';
-
-  if (res.isOk) {
-    if(existingUser.employee === currentUser.employee) {
-      currentUser.employee = newName;
-      currentUser.role = newRole;
-      document.getElementById('userBadge').textContent = `${currentUser.employee} (${currentUser.role==='admin'?'ผู้ดูแล':currentUser.role==='owner'?'เจ้าของ':'พนักงาน'})`;
-    }
-    showToast('แก้ไขข้อมูลผู้ใช้สำเร็จ');
-    closeEditUserModal();
-  } else {
-    errEl.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
-    errEl.classList.remove('hidden');
-  }
-};
-
-document.getElementById('logoutBtn').onclick = ()=>{
-  currentUser = null;
-  document.getElementById('mainApp').classList.add('hidden');
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('loginUser').value='';
-  document.getElementById('loginPass').value='';
-  document.getElementById('loginError').classList.add('hidden');
-  currentPage='dashboard';
-};
 
 // ===== SDK INIT =====
 const dataHandler = {
@@ -2089,22 +1923,7 @@ const dataHandler = {
       document.querySelectorAll('.bg-white').forEach(el=>{
         el.style.backgroundColor = config.surface_color || defaultConfig.surface_color;
       });
-    },
-    mapToCapabilities: (config) => ({
-      recolorables: [
-        {get:()=>config.background_color||defaultConfig.background_color, set:(v)=>{config.background_color=v;window.elementSdk.setConfig({background_color:v})}},
-        {get:()=>config.surface_color||defaultConfig.surface_color, set:(v)=>{config.surface_color=v;window.elementSdk.setConfig({surface_color:v})}},
-        {get:()=>config.text_color||defaultConfig.text_color, set:(v)=>{config.text_color=v;window.elementSdk.setConfig({text_color:v})}},
-        {get:()=>config.primary_action_color||defaultConfig.primary_action_color, set:(v)=>{config.primary_action_color=v;window.elementSdk.setConfig({primary_action_color:v})}},
-        {get:()=>config.secondary_action_color||defaultConfig.secondary_action_color, set:(v)=>{config.secondary_action_color=v;window.elementSdk.setConfig({secondary_action_color:v})}}
-      ],
-      borderables: [],
-      fontEditable: undefined,
-      fontSizeable: undefined
-    }),
-    mapToEditPanelValues: (config) => new Map([
-      ['store_name', config.store_name || defaultConfig.store_name]
-    ])
+    }
   });
 
   // Data SDK
