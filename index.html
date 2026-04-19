@@ -189,7 +189,12 @@
          <label for="loginPass" class="block text-sm font-medium text-gray-600">รหัสผ่าน</label> 
          <button type="button" onclick="openForgotPassModal()" class="text-xs text-coral hover:text-royal transition font-medium">ลืมรหัสผ่าน?</button>
        </div>
-       <input id="loginPass" type="password" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition" placeholder="ใส่รหัสผ่าน">
+       <div class="relative">
+         <input id="loginPass" type="password" class="w-full border border-gray-200 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition" placeholder="ใส่รหัสผ่าน">
+         <button type="button" onclick="togglePasswordVisibility('loginPass', 'loginPassIcon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-coral transition focus:outline-none">
+           <i data-lucide="eye" id="loginPassIcon" class="w-5 h-5"></i>
+         </button>
+       </div>
       </div>
       <div id="loginError" class="text-coral text-sm hidden"></div>
       <button id="loginBtn" class="w-full bg-coral text-white py-3 rounded-xl font-semibold hover:opacity-80 transition">เข้าสู่ระบบ</button>
@@ -472,28 +477,56 @@ window.closeForgotPassModal = () => {
   document.getElementById('forgotPassModal').classList.add('hidden');
 };
 
+// ฟังก์ชันสำหรับเปิด/ปิดตารหัสผ่าน
+window.togglePasswordVisibility = (inputId, iconId) => {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.setAttribute('data-lucide', 'eye-off');
+  } else {
+    input.type = 'password';
+    icon.setAttribute('data-lucide', 'eye');
+  }
+  lucide.createIcons();
+};
+
 document.getElementById('loginBtn').onclick = async ()=>{
   const username = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value.trim();
   const errEl = document.getElementById('loginError');
 
-  // ตรวจสอบหรือสร้าง Admin คนแรก
-  const adminRec = getUsers().find(u=>u.employee==='admin');
-  if(!adminRec && username==='admin' && pass==='1234') {
+  // ตรวจสอบหรือสร้าง Admin คนแรก (ไม่สนใจตัวพิมพ์เล็ก/ใหญ่)
+  const adminRec = getUsers().find(u => (u.employee || '').toLowerCase() === 'admin');
+  if(!adminRec && username.toLowerCase() === 'admin' && pass === '1234') {
     currentUser = {employee:'admin',role:'admin'};
     await window.dataSdk.create({type:'user',category:'',style:'',color:'',size:'',quantity:0,action:'',amount:0,employee:'admin',role:'admin',password:'1234',date:new Date().toISOString(),note:''});
     showMainApp();
     return;
   }
 
-  // ล็อกอินพนักงาน
-  const user = getUsers().find(u=>u.employee===username&&u.password===pass);
+  // ล็อกอินพนักงาน (หาชื่อผู้ใช้แบบไม่สนใจตัวพิมพ์เล็ก/ใหญ่)
+  const user = getUsers().find(u => (u.employee || '').toLowerCase() === username.toLowerCase() && u.password === pass);
+  
   if(user) {
     currentUser = {employee:user.employee, role:user.role};
     showMainApp();
   } else {
-    errEl.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+    // ระบบช่วยเหลือ: เช็คว่าพิมพ์ชื่อผู้ใช้ถูก แต่รหัสผิดหรือไม่
+    const existUser = getUsers().find(u => (u.employee || '').toLowerCase() === username.toLowerCase());
+    if (existUser && username.toLowerCase() === 'admin') {
+        errEl.innerHTML = `รหัสผ่านไม่ถูกต้อง! <br><span class="text-sm mt-2 block text-gray-500">รหัสผ่านปัจจุบันของแอดมินคือ:<br><b class="text-lg text-ink bg-gray-100 px-3 py-1 rounded-lg inline-block mt-1 border border-gray-200">${existUser.password || 'ไม่มีรหัสผ่าน (ปล่อยช่องรหัสผ่านให้ว่างไว้ได้เลย)'}</b></span>`;
+    } else {
+        errEl.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+    }
     errEl.classList.remove('hidden');
+    
+    // แอบแสดงรหัสผ่านผู้ใช้งานใน Console สำหรับเป็นตัวช่วยกรณีลืมจริงๆ 
+    // (เปิด Console โดยกด F12 บนคีย์บอร์ดแล้วเลือกแถบ Console)
+    console.warn("--- ตัวช่วยฉุกเฉิน (Debug) ---");
+    console.log("รายชื่อผู้ใช้งานและรหัสผ่านทั้งหมดที่มีในระบบปัจจุบัน:");
+    const currentUsersList = getUsers().map(u => ({ 'ชื่อผู้ใช้': u.employee, 'รหัสผ่าน': u.password, 'สิทธิ์': u.role }));
+    console.table(currentUsersList);
   }
 };
 
@@ -517,6 +550,16 @@ document.getElementById('logoutBtn').onclick = () => {
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginUser').value='';
   document.getElementById('loginPass').value='';
+  
+  // รีเซ็ตปุ่มดวงตากลับเป็นสถานะเดิม (ซ่อนรหัส) ทุกครั้งที่ออกจากระบบ
+  const passInput = document.getElementById('loginPass');
+  const passIcon = document.getElementById('loginPassIcon');
+  if(passInput && passIcon) {
+    passInput.type = 'password';
+    passIcon.setAttribute('data-lucide', 'eye');
+    lucide.createIcons();
+  }
+
   document.getElementById('loginError').classList.add('hidden');
   currentPage='dashboard';
 };
@@ -617,7 +660,8 @@ document.getElementById('editUserForm').onsubmit = async (e) => {
   const existingUser = getUsers().find(u => u.__backendId === id);
   if (!existingUser) return;
 
-  const nameConflict = getUsers().find(u => u.employee === newName && u.__backendId !== id);
+  // ตรวจสอบชื่อซ้ำ (ไม่สนใจตัวพิมพ์เล็ก-ใหญ่)
+  const nameConflict = getUsers().find(u => (u.employee||'').toLowerCase() === newName.toLowerCase() && u.__backendId !== id);
   if (nameConflict) {
     errEl.textContent = 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว';
     errEl.classList.remove('hidden');
@@ -923,7 +967,7 @@ window.deleteColorItem = async(color) => {
     await saveConfig();
     renderPage();
   }
-};
+}
 
 window.deleteSizeItem = async(size) => {
   const idx = SIZES.indexOf(size);
@@ -1605,7 +1649,7 @@ document.getElementById('editLogForm').onsubmit = async (e) => {
   } catch(err) {
     errEl.textContent = err.message; errEl.classList.remove('hidden');
   } finally {
-    btn.disabled = false; btn.textContent = 'บันทึก';
+    btn.disabled = false; btn.textContent = 'บันึก';
   }
 };
 
@@ -1871,7 +1915,12 @@ function renderManageUsers(c) {
     const role = document.getElementById('nu_role').value;
     const errEl = document.getElementById('nu_error');
     if(!name||!pass) { errEl.textContent='กรุณากรอกข้อมูลให้ครบ'; errEl.classList.remove('hidden'); return; }
-    if(getUsers().find(u=>u.employee===name)) { errEl.textContent='ชื่อผู้ใช้นี้มีแล้ว'; errEl.classList.remove('hidden'); return; }
+    
+    // ตรวจสอบชื่อซ้ำ (ไม่สนใจตัวพิมพ์เล็ก-ใหญ่)
+    if(getUsers().find(u => (u.employee||'').toLowerCase() === name.toLowerCase())) { 
+        errEl.textContent='ชื่อผู้ใช้นี้มีแล้ว'; errEl.classList.remove('hidden'); return; 
+    }
+
     errEl.classList.add('hidden');
     const btn = document.getElementById('nu_btn'); btn.disabled=true; btn.textContent='กำลังบันทึก...';
     const res = await window.dataSdk.create({type:'user',category:'',style:'',color:'',size:'',quantity:0,action:'',amount:0,employee:name,role,password:pass,date:new Date().toISOString(),note:''});
